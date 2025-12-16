@@ -5,7 +5,7 @@ using pacman3.Interfaces;
 using pacman3.Models.Game;
 using pacman3.Utils;
 
-namespace pacman3.Models.Player
+namespace pacman3.Models
 {
     public class Player : GameObject, IMovable
     {
@@ -264,7 +264,7 @@ namespace pacman3.Models.Player
             ObjectColor = Colors.Yellow;
         }
 
-        public override void Draw(System.Windows.Media.DrawingContext drawingContext)
+        public override void Draw(DrawingContext drawingContext)
         {
             if (!IsActive) return;
 

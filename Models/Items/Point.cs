@@ -52,7 +52,7 @@ namespace pacman3.Models.Items
         {
             base.OnCollision(other);
 
-            if (other is Models.Player.Player)
+            if (other is Player)
             {
                 Collect();
             }

@@ -40,8 +40,6 @@ namespace pacman3
             _gameTimer.Interval = TimeSpan.FromMilliseconds(16);
             _gameTimer.Tick += GameLoop;
             _gameTimer.Start();
-
-            StatusText.Text = "Базовые классы созданы. Объекты движутся.";
         }
 
         private void GameLoop(object sender, EventArgs e)

@@ -26,7 +26,7 @@
         <!-- Статус -->
         <StatusBar Grid.Row="2" Background="LightGray">
             <StatusBarItem>
-                <TextBlock x:Name="StatusText" Text="Спринт 1: Базовая структура"/>
+                <TextBlock x:Name="StatusText"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>
