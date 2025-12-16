@@ -5,14 +5,12 @@
         Height="600" 
         Width="800"
         WindowStartupLocation="CenterScreen">
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
         <!-- Заголовок -->
         <Border Grid.Row="0" Background="DarkBlue" Padding="10">
             <TextBlock Text="PAC-MAN" 
@@ -21,12 +19,10 @@
                       FontWeight="Bold"
                       HorizontalAlignment="Center"/>
         </Border>
-
         <!-- Игровая область -->
         <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="10">
             <Canvas x:Name="GameCanvas" Background="Black"/>
         </Border>
-
         <!-- Статус -->
         <StatusBar Grid.Row="2" Background="LightGray">
             <StatusBarItem>
