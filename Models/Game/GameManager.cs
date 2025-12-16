@@ -64,26 +64,49 @@ namespace pacman3.Models.Game
         private void InitializeGhosts()
         {
             _ghosts = new List<Ghost>
-    {
-        new BlinkyGhost(),
-        new PinkyGhost(),
-        new InkyGhost(),
-        new ClydeGhost()
-    };
+            {
+                new BlinkyGhost(),
+                new PinkyGhost(),
+                new InkyGhost(),
+                new ClydeGhost()
+            };
 
-            // Ставим привидений ВНУТРИ дома призраков
+            // Получаем границы дома призраков
             var ghostHouse = _gameField.GhostHouse;
-            _ghosts[0].Position = new Vector2(ghostHouse.X - 48, ghostHouse.Y - 16);
-            _ghosts[1].Position = new Vector2(ghostHouse.X + 48, ghostHouse.Y - 16);
-            _ghosts[2].Position = new Vector2(ghostHouse.X - 16, ghostHouse.Y + 16);
-            _ghosts[3].Position = new Vector2(ghostHouse.X + 16, ghostHouse.Y + 16);
+            int tileSize = _gameField.TileSize;
+
+            // Дом призраков: 7x5 тайлов, центр в ghostHouse
+            int houseCenterX = (int)ghostHouse.X;
+            int houseCenterY = (int)ghostHouse.Y;
+            int houseLeft = houseCenterX - (3 * tileSize);  // 7/2 = 3.5, округляем до 3
+            int houseRight = houseCenterX + (3 * tileSize);
+            int houseTop = houseCenterY - (2 * tileSize);   // 5/2 = 2.5, округляем до 2
+            int houseBottom = houseCenterY + (2 * tileSize);
+
+            // Размещаем привидений СРАЗУ ЗА ПРЕДЕЛАМИ ДОМА:
+
+            // 1. Blinky - справа от дома
+            _ghosts[0].Position = new Vector2(houseRight + tileSize, houseCenterY);
+            _ghosts[0].Direction = Direction.Left; // Двигается влево, к дому
+
+            // 2. Pinky - слева от дома  
+            _ghosts[1].Position = new Vector2(houseLeft - tileSize, houseCenterY);
+            _ghosts[1].Direction = Direction.Right; // Двигается вправо, к дому
+
+            // 3. Inky - сверху от дома
+            _ghosts[2].Position = new Vector2(houseCenterX, houseTop - tileSize);
+            _ghosts[2].Direction = Direction.Down; // Двигается вниз, к дому
+
+            // 4. Clyde - снизу от дома (но выше выхода)
+            _ghosts[3].Position = new Vector2(houseCenterX, houseBottom + tileSize);
+            _ghosts[3].Direction = Direction.Up; // Двигается вверх, к дому
 
             foreach (var ghost in _ghosts)
             {
                 ghost.State = GhostState.Normal;
                 ghost.IsActive = true;
                 ghost.SetGameField(_gameField);
-                ghost.Direction = Direction.Down; // Направление для выхода
+                // Направление уже установлено выше для каждого привидения
             }
         }
 
@@ -156,12 +179,12 @@ namespace pacman3.Models.Game
                     // Временно деактивируем привидение
                     ghost.IsActive = false;
 
-                    // Через 3 секунды возрождаем
+                    // Через 3 секунды возрождаем ЗА ПРЕДЕЛАМИ дома
                     var timer = new System.Windows.Threading.DispatcherTimer();
                     timer.Interval = TimeSpan.FromSeconds(3);
                     timer.Tick += (s, e) =>
                     {
-                        ghost.Respawn(_gameField.GhostHouse);
+                        RespawnGhostOutsideHouse(ghost);
                         timer.Stop();
                     };
                     timer.Start();
@@ -181,12 +204,50 @@ namespace pacman3.Models.Game
                         ResetLevel();
                     }
                 }
-                // Если призрак мертв - игрок просто проходит сквозь него
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Ошибка при обработке столкновения: {ex.Message}");
             }
+        }
+
+        private void RespawnGhostOutsideHouse(Ghost ghost)
+        {
+            var ghostHouse = _gameField.GhostHouse;
+            int tileSize = _gameField.TileSize;
+
+            // Выбираем случайную позицию вокруг дома
+            var random = new Random();
+            int side = random.Next(4); // 0: слева, 1: справа, 2: сверху, 3: снизу
+
+            Vector2 spawnPosition;
+            Direction spawnDirection;
+
+            switch (side)
+            {
+                case 0: // Слева
+                    spawnPosition = new Vector2(ghostHouse.X - (4 * tileSize), ghostHouse.Y);
+                    spawnDirection = Direction.Right;
+                    break;
+                case 1: // Справа
+                    spawnPosition = new Vector2(ghostHouse.X + (4 * tileSize), ghostHouse.Y);
+                    spawnDirection = Direction.Left;
+                    break;
+                case 2: // Сверху
+                    spawnPosition = new Vector2(ghostHouse.X, ghostHouse.Y - (3 * tileSize));
+                    spawnDirection = Direction.Down;
+                    break;
+                default: // Снизу
+                    spawnPosition = new Vector2(ghostHouse.X, ghostHouse.Y + (3 * tileSize));
+                    spawnDirection = Direction.Up;
+                    break;
+            }
+
+            ghost.Position = spawnPosition;
+            ghost.State = GhostState.Normal;
+            ghost.Direction = spawnDirection;
+            ghost.IsActive = true;
+            ghost.Speed = 2.0;
         }
 
         private bool IsColliding(GameObject obj1, GameObject obj2)
@@ -263,13 +324,33 @@ namespace pacman3.Models.Game
         {
             _player.Respawn(_gameField.PlayerSpawn);
 
-            foreach (var ghost in _ghosts)
-            {
-                ghost.Respawn(_gameField.GhostHouse);
-                ghost.State = GhostState.Normal;
-                ghost.IsActive = true;
-                ghost.Speed = 2.0;
-            }
+            // Возрождаем привидений за пределами дома
+            var ghostHouse = _gameField.GhostHouse;
+            int tileSize = _gameField.TileSize;
+
+            _ghosts[0].Position = new Vector2(ghostHouse.X + (4 * tileSize), ghostHouse.Y);
+            _ghosts[0].Direction = Direction.Left;
+            _ghosts[0].State = GhostState.Normal;
+            _ghosts[0].IsActive = true;
+            _ghosts[0].Speed = 2.0;
+
+            _ghosts[1].Position = new Vector2(ghostHouse.X - (4 * tileSize), ghostHouse.Y);
+            _ghosts[1].Direction = Direction.Right;
+            _ghosts[1].State = GhostState.Normal;
+            _ghosts[1].IsActive = true;
+            _ghosts[1].Speed = 2.0;
+
+            _ghosts[2].Position = new Vector2(ghostHouse.X, ghostHouse.Y - (3 * tileSize));
+            _ghosts[2].Direction = Direction.Down;
+            _ghosts[2].State = GhostState.Normal;
+            _ghosts[2].IsActive = true;
+            _ghosts[2].Speed = 2.0;
+
+            _ghosts[3].Position = new Vector2(ghostHouse.X, ghostHouse.Y + (3 * tileSize));
+            _ghosts[3].Direction = Direction.Up;
+            _ghosts[3].State = GhostState.Normal;
+            _ghosts[3].IsActive = true;
+            _ghosts[3].Speed = 2.0;
         }
 
         public Player GetPlayer() => _player;
