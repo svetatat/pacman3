@@ -5,16 +5,13 @@ using pacman3.Interfaces;
 using pacman3.Models.Game;
 using pacman3.Utils;
 
-namespace pacman3.Models
+namespace pacman3.Models.Player
 {
     public class Player : GameObject, IMovable
     {
         private int _lives;
         private int _score;
         private Direction _nextDirection;
-
-        // Реализация свойства Velocity из интерфейса IMovable
-        public Vector2 Velocity { get; set; }
 
         public int Lives
         {
@@ -71,7 +68,6 @@ namespace pacman3.Models
             Score = 0;
             IsMoving = false;
             IsInvulnerable = false;
-            Velocity = new Vector2(0, 0); // Используем конструктор вместо Zero
         }
 
         public void HandleInput(Key key)
@@ -100,28 +96,6 @@ namespace pacman3.Models
             }
         }
 
-        // Реализация метода Move из интерфейса IMovable
-        public void Move(Vector2 direction)
-        {
-            // Проверяем, является ли direction нулевым
-            if (direction.X == 0 && direction.Y == 0) return;
-
-            // Обновляем Velocity на основе направления и скорости
-            Velocity = new Vector2(
-                direction.X * (float)Speed,
-                direction.Y * (float)Speed
-            );
-
-            Vector2 newPosition = new Vector2(
-                Position.X + Velocity.X,
-                Position.Y + Velocity.Y
-            );
-
-            Position = newPosition;
-            IsMoving = true;
-        }
-
-        // Старый метод Move (для обратной совместимости)
         public void Move()
         {
             if (Direction == Direction.None) return;
@@ -145,33 +119,7 @@ namespace pacman3.Models
             }
 
             Position = newPosition;
-
-            // Обновляем Velocity в соответствии с направлением
-            UpdateVelocityFromDirection();
-
             IsMoving = true;
-        }
-
-        private void UpdateVelocityFromDirection()
-        {
-            switch (Direction)
-            {
-                case Direction.Up:
-                    Velocity = new Vector2(0, -(float)Speed);
-                    break;
-                case Direction.Down:
-                    Velocity = new Vector2(0, (float)Speed);
-                    break;
-                case Direction.Left:
-                    Velocity = new Vector2(-(float)Speed, 0);
-                    break;
-                case Direction.Right:
-                    Velocity = new Vector2((float)Speed, 0);
-                    break;
-                case Direction.None:
-                    Velocity = new Vector2(0, 0); // Используем конструктор
-                    break;
-            }
         }
 
         public void ApplyNextDirection(bool canTurn)
@@ -180,7 +128,6 @@ namespace pacman3.Models
             {
                 Direction = NextDirection;
                 NextDirection = Direction.None;
-                UpdateVelocityFromDirection();
             }
         }
 
@@ -205,6 +152,7 @@ namespace pacman3.Models
             Score += points;
         }
 
+        // ИЗМЕНЕНО: убрана зависимость от Point, теперь просто очки
         public void CollectPoint(int pointValue)
         {
             AddScore(pointValue);
@@ -246,7 +194,6 @@ namespace pacman3.Models
             IsActive = true;
             Direction = Direction.None;
             NextDirection = Direction.None;
-            Velocity = new Vector2(0, 0); // Используем конструктор
             IsMoving = false;
             BecomeInvulnerable(TimeSpan.FromSeconds(1.5));
         }
@@ -257,14 +204,13 @@ namespace pacman3.Models
             Score = 0;
             Direction = Direction.None;
             NextDirection = Direction.None;
-            Velocity = new Vector2(0, 0); // Используем конструктор
             IsMoving = false;
             IsInvulnerable = false;
             IsActive = true;
             ObjectColor = Colors.Yellow;
         }
 
-        public override void Draw(DrawingContext drawingContext)
+        public override void Draw(System.Windows.Media.DrawingContext drawingContext)
         {
             if (!IsActive) return;
 

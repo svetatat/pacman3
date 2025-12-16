@@ -1,5 +1,6 @@
-﻿using pacman3.Interfaces;
+﻿using pacman3.Models;
 using pacman3.Models.Game;
+using pacman3.Models.Player;
 using pacman3.Utils;
 using System;
 using System.Windows;
@@ -13,51 +14,78 @@ namespace pacman3
     {
         private GameTime _gameTime;
         private DispatcherTimer _gameTimer;
-        private GameObject _testObject1;
-        private GameObject _testObject2;
+        private GameField _gameField;
+        private Player _player;
+        private bool _isGameRunning = true;
 
         public MainWindow()
         {
             InitializeComponent();
             InitializeGame();
+            this.Focus();
         }
 
         private void InitializeGame()
         {
             _gameTime = new GameTime();
 
-            // Создаем объекты с помощью конструктора
-            _testObject1 = new TestGameObject(100, 100);
-            _testObject1.ObjectColor = Colors.Yellow;
-            _testObject1.Size = 40;
+            // Создаем игровое поле
+            _gameField = new GameField(10, 10);
+            _gameField.Initialize();
 
-            _testObject2 = new TestGameObject(200, 200);
-            _testObject2.ObjectColor = Colors.Red;
-            _testObject2.Size = 40;
+            // Создаем игрока в центре
+            double spawnX = 5 * _gameField.TileSize + _gameField.TileSize / 2;
+            double spawnY = 5 * _gameField.TileSize + _gameField.TileSize / 2;
+            _player = new Player(spawnX, spawnY);
 
-            // Таймер игры
+            // Подписываемся на события
+            _player.ScoreChanged += (s, score) =>
+                Dispatcher.Invoke(() => ScoreText.Text = $"Очки: {score}");
+
+            _player.LivesChanged += (s, lives) =>
+                Dispatcher.Invoke(() => LivesText.Text = $"Жизни: {lives}");
+
+            // Обновляем UI
+            ScoreText.Text = $"Очки: {_player.Score}";
+            LivesText.Text = $"Жизни: {_player.Lives}";
+
+            // Запускаем игровой цикл
             _gameTimer = new DispatcherTimer();
             _gameTimer.Interval = TimeSpan.FromMilliseconds(16);
             _gameTimer.Tick += GameLoop;
             _gameTimer.Start();
+
+            StatusText.Text = "Игра запущена. Используйте стрелки для движения.";
         }
 
         private void GameLoop(object sender, EventArgs e)
         {
+            if (!_isGameRunning) return;
+
             _gameTime.Update(_gameTimer.Interval);
 
-            // Обновляем объекты
-            _testObject1.Update(_gameTime.ElapsedTime);
-            _testObject2.Update(_gameTime.ElapsedTime);
+            // Обновляем поле
+            _gameField.Update(_gameTime.ElapsedTime);
 
-            // Проверяем столкновение
-            if (_testObject1.IntersectsWith(_testObject2))
+            // Проверяем движение
+            bool canMove = _gameField.CanMoveTo(_player.Position, _player.Direction, _player.Speed);
+
+            if (canMove)
             {
-                _testObject1.OnCollision(_testObject2);
-                _testObject2.OnCollision(_testObject1);
+                bool canTurn = _gameField.CanMoveTo(_player.Position, _player.NextDirection, _player.Speed);
+                _player.ApplyNextDirection(canTurn);
+                _player.Update(_gameTime.ElapsedTime);
             }
 
-            // Отрисовываем
+            // Проверяем точки
+            var point = _gameField.GetPointAt(_player.Position);
+            if (point != null && !point.IsCollected)
+            {
+                point.Collect();
+                _player.CollectPoint(point.PointValue);
+            }
+
+            // Отрисовка
             DrawGame();
         }
 
@@ -68,14 +96,69 @@ namespace pacman3
 
             using (var drawingContext = drawingVisual.RenderOpen())
             {
-                _testObject1.Draw(drawingContext);
-                _testObject2.Draw(drawingContext);
+                // Отрисовываем поле
+                _gameField.Draw(drawingContext);
+
+                // Отрисовываем игрока
+                _player.Draw(drawingContext);
             }
 
             GameCanvas.Children.Add(new DrawingVisualHost(drawingVisual));
         }
 
-        // Вспомогательный класс для отрисовки
+        private void PauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            TogglePause();
+        }
+
+        private void RestartButton_Click(object sender, RoutedEventArgs e)
+        {
+            RestartGame();
+        }
+
+        private void TogglePause()
+        {
+            _isGameRunning = !_isGameRunning;
+            PauseOverlay.Visibility = _isGameRunning ? Visibility.Collapsed : Visibility.Visible;
+            PauseButton.Content = _isGameRunning ? "Пауза" : "Продолжить";
+            StatusText.Text = _isGameRunning ? "Игра запущена" : "ПАУЗА";
+        }
+
+        private void RestartGame()
+        {
+            _gameTimer.Stop();
+            InitializeGame();
+            _isGameRunning = true;
+            PauseOverlay.Visibility = Visibility.Collapsed;
+            PauseButton.Content = "Пауза";
+            StatusText.Text = "Игра перезапущена";
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            if (!_isGameRunning && e.Key != Key.Escape && e.Key != Key.R) return;
+
+            switch (e.Key)
+            {
+                case Key.Escape:
+                    TogglePause();
+                    break;
+
+                case Key.R:
+                    RestartGame();
+                    break;
+
+                case Key.Up:
+                case Key.Down:
+                case Key.Left:
+                case Key.Right:
+                    _player.HandleInput(e.Key);
+                    break;
+            }
+        }
+
         private class DrawingVisualHost : FrameworkElement
         {
             private readonly DrawingVisual _visual;
@@ -89,45 +172,6 @@ namespace pacman3
         {
             _gameTimer?.Stop();
             base.OnClosed(e);
-        }
-
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
-
-            if (e.Key == Key.Escape)
-            {
-                _gameTimer.IsEnabled = !_gameTimer.IsEnabled;
-                StatusText.Text = _gameTimer.IsEnabled ? "Игра запущена" : "ПАУЗА";
-            }
-        }
-    }
-
-    // Тестовый класс для проверки
-    public class TestGameObject : GameObject
-    {
-        public TestGameObject(double x, double y) : base(x, y)
-        {
-        }
-
-        public override void Update(TimeSpan gameTime)
-        {
-            // Простое движение
-            Position = new Vector2(
-                Position.X + 0.5,
-                Position.Y + 0.3
-            );
-
-            // Возврат при выходе за границы
-            if (Position.X > 700) Position = new Vector2(100, Position.Y);
-            if (Position.Y > 500) Position = new Vector2(Position.X, 100);
-        }
-
-        public override void OnCollision(ICollidable other)
-        {
-            base.OnCollision(other);
-            // Меняем цвет при столкновении
-            ObjectColor = Colors.Green;
         }
     }
 }
