@@ -1,9 +1,9 @@
 ﻿using pacman3.Interfaces;
 using pacman3.Models.Game;
-using pacman3.Models.Game;
 using pacman3.Utils;
 using System;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -24,25 +24,28 @@ namespace pacman3
 
         private void InitializeGame()
         {
-            // Создаем игровое время
             _gameTime = new GameTime();
 
-            // Создаем тестовые объекты для проверки GameObject
-            _testObject1 = new TestGameObject(100, 100) { ObjectColor = Colors.Yellow };
-            _testObject2 = new TestGameObject(200, 200) { ObjectColor = Colors.Red };
+            // Создаем объекты с помощью конструктора
+            _testObject1 = new TestGameObject(100, 100);
+            _testObject1.ObjectColor = Colors.Yellow; // Теперь работает!
+            _testObject1.Size = 40; // Теперь работает!
 
-            // Настраиваем таймер для обновления
+            _testObject2 = new TestGameObject(200, 200);
+            _testObject2.ObjectColor = Colors.Red;
+            _testObject2.Size = 40;
+
+            // Таймер игры
             _gameTimer = new DispatcherTimer();
-            _gameTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 FPS
+            _gameTimer.Interval = TimeSpan.FromMilliseconds(16);
             _gameTimer.Tick += GameLoop;
             _gameTimer.Start();
 
-            StatusText.Text = "Тест запущен: 2 объекта созданы";
+            StatusText.Text = "Базовые классы созданы. Объекты движутся.";
         }
 
         private void GameLoop(object sender, EventArgs e)
         {
-            // Обновляем игровое время
             _gameTime.Update(_gameTimer.Interval);
 
             // Обновляем объекты
@@ -57,27 +60,29 @@ namespace pacman3
             }
 
             // Отрисовываем
-            TestCanvas.Children.Clear();
+            DrawGame();
+        }
+
+        private void DrawGame()
+        {
+            GameCanvas.Children.Clear();
             var drawingVisual = new DrawingVisual();
+
             using (var drawingContext = drawingVisual.RenderOpen())
             {
                 _testObject1.Draw(drawingContext);
                 _testObject2.Draw(drawingContext);
             }
 
-            TestCanvas.Children.Add(new DrawingVisualHost(drawingVisual));
+            GameCanvas.Children.Add(new DrawingVisualHost(drawingVisual));
         }
 
-        // Вспомогательный класс для отображения DrawingVisual
+        // Вспомогательный класс для отрисовки
         private class DrawingVisualHost : FrameworkElement
         {
             private readonly DrawingVisual _visual;
 
-            public DrawingVisualHost(DrawingVisual visual)
-            {
-                _visual = visual;
-            }
-
+            public DrawingVisualHost(DrawingVisual visual) => _visual = visual;
             protected override Visual GetVisualChild(int index) => _visual;
             protected override int VisualChildrenCount => 1;
         }
@@ -87,27 +92,35 @@ namespace pacman3
             _gameTimer?.Stop();
             base.OnClosed(e);
         }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            if (e.Key == Key.Escape)
+            {
+                _gameTimer.IsEnabled = !_gameTimer.IsEnabled;
+                StatusText.Text = _gameTimer.IsEnabled ? "Игра запущена" : "ПАУЗА";
+            }
+        }
     }
 
-    /// <summary>
-    /// Тестовый класс для проверки GameObject
-    /// </summary>
+    // Тестовый класс для проверки
     public class TestGameObject : GameObject
     {
         public TestGameObject(double x, double y) : base(x, y)
         {
-            Size = 40;
         }
 
         public override void Update(TimeSpan gameTime)
         {
-            // Простое движение для теста
+            // Простое движение
             Position = new Vector2(
                 Position.X + 0.5,
                 Position.Y + 0.3
             );
 
-            // Если вышли за границы - возвращаем
+            // Возврат при выходе за границы
             if (Position.X > 700) Position = new Vector2(100, Position.Y);
             if (Position.Y > 500) Position = new Vector2(Position.X, 100);
         }
@@ -115,7 +128,8 @@ namespace pacman3
         public override void OnCollision(ICollidable other)
         {
             base.OnCollision(other);
-            ObjectColor = Colors.Green; // Меняем цвет при столкновении
+            // Меняем цвет при столкновении
+            ObjectColor = Colors.Green;
         }
     }
 }

@@ -6,10 +6,7 @@ using System.Threading.Tasks;
 
 namespace pacman3.Utils
 {
-    /// <summary>
-    /// Класс для отслеживания игрового времени
-    /// </summary>
-    public class GameTime
+    public class GameTime // Класс для отслеживания игрового времени
     {
         public TimeSpan TotalTime { get; private set; }
         public TimeSpan ElapsedTime { get; private set; }
@@ -19,7 +16,6 @@ namespace pacman3.Utils
             ElapsedTime = elapsedTime;
             TotalTime += elapsedTime;
         }
-
         public void Reset()
         {
             TotalTime = TimeSpan.Zero;

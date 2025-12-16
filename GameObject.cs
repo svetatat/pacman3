@@ -1,59 +1,44 @@
-﻿using pacman3.Interfaces;
-using pacman3.Interfaces;
-using pacman3.Utils;
-using System;
-using System.Numerics;
+﻿using System;
 using System.Windows;
 using System.Windows.Media;
+using pacman3.Interfaces;
+using pacman3.Utils;
 
 namespace pacman3.Models.Game
 {
-    /// <summary>
-    /// Базовый абстрактный класс для всех игровых объектов
-    /// Демонстрация: Наследование + Абстрактный класс
-    /// </summary>
     public abstract class GameObject : IGameComponent, ICollidable, IDrawable
     {
-        // ИНКАПСУЛЯЦИЯ: приватные поля с публичными свойствами
         private Vector2 _position;
         private bool _isActive = true;
+        private Color _objectColor = Colors.White;
+        private double _size = 32;
 
-        /// <summary>
-        /// Позиция объекта на поле
-        /// </summary>
         public Vector2 Position
         {
             get => _position;
-            set
-            {
-                // Можно добавить валидацию
-                _position = value;
-            }
+            set => _position = value;
         }
 
-        /// <summary>
-        /// Активен ли объект
-        /// </summary>
         public bool IsActive
         {
             get => _isActive;
             protected set => _isActive = value;
         }
 
-        /// <summary>
-        /// Размер объекта (для отрисовки и коллизий)
-        /// </summary>
-        public virtual double Size { get; protected set; } = 32;
+        // ИСПРАВЛЕНО: Добавлен public set
+        public virtual Color ObjectColor
+        {
+            get => _objectColor;
+            set => _objectColor = value;
+        }
 
-        /// <summary>
-        /// Цвет объекта (для базовой отрисовки)
-        /// </summary>
-        public virtual Color ObjectColor { get; protected set; } = Colors.White;
+        // ИСПРАВЛЕНО: Добавлен public set
+        public virtual double Size
+        {
+            get => _size;
+            set => _size = value;
+        }
 
-        // Реализация ICollidable
-        /// <summary>
-        /// Границы объекта для проверки столкновений
-        /// </summary>
         public virtual Rect Bounds
         {
             get
@@ -68,7 +53,6 @@ namespace pacman3.Models.Game
             }
         }
 
-        // Конструктор
         protected GameObject()
         {
             Initialize();
@@ -79,33 +63,22 @@ namespace pacman3.Models.Game
             Position = new Vector2(x, y);
         }
 
-        // Реализация IGameComponent
         public virtual void Initialize()
         {
-            // Базовая инициализация
             IsActive = true;
         }
 
-        public virtual void Update(TimeSpan gameTime)
-        {
-            // Базовая логика обновления
-            // Может быть переопределена в наследниках
-        }
+        public virtual void Update(TimeSpan gameTime) { }
 
-        // Реализация ICollidable
         public virtual void OnCollision(ICollidable other)
         {
-            // Базовая реакция на столкновение
-            // Будет переопределена в конкретных объектах
-            Console.WriteLine($"{GetType().Name} столкнулся с {other.GetType().Name}");
+            // Базовая реализация
         }
 
-        // Реализация IDrawable
         public virtual void Draw(DrawingContext drawingContext)
         {
             if (!IsActive) return;
 
-            // Базовая отрисовка - круг
             var brush = new SolidColorBrush(ObjectColor);
             var pen = new Pen(Brushes.Black, 1);
 
@@ -119,17 +92,11 @@ namespace pacman3.Models.Game
             );
         }
 
-        /// <summary>
-        /// Проверка столкновения с другим объектом
-        /// </summary>
         public bool IntersectsWith(GameObject other)
         {
             return Bounds.IntersectsWith(other.Bounds);
         }
 
-        /// <summary>
-        /// Деактивация объекта
-        /// </summary>
         public virtual void Deactivate()
         {
             IsActive = false;

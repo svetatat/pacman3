@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using pacman3.Utils;
+using System.Windows;
 
 namespace pacman3.Interfaces
 {
@@ -10,17 +11,17 @@ namespace pacman3.Interfaces
         /// <summary>
         /// Позиция объекта
         /// </summary>
-        Vector Position { get; set; }
+        System.Numerics.Vector Position { get; set; }
 
         /// <summary>
         /// Скорость объекта
         /// </summary>
-        Vector Velocity { get; set; }
+        System.Numerics.Vector Velocity { get; set; }
 
         /// <summary>
         /// Перемещение объекта
         /// </summary>
         /// <param name="direction">Направление движения</param>
-        void Move(Vector direction);
+        void Move(System.Numerics.Vector direction);
     }
 }
