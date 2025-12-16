@@ -28,8 +28,8 @@ namespace pacman3
 
             // Создаем объекты с помощью конструктора
             _testObject1 = new TestGameObject(100, 100);
-            _testObject1.ObjectColor = Colors.Yellow; // Теперь работает!
-            _testObject1.Size = 40; // Теперь работает!
+            _testObject1.ObjectColor = Colors.Yellow;
+            _testObject1.Size = 40;
 
             _testObject2 = new TestGameObject(200, 200);
             _testObject2.ObjectColor = Colors.Red;

@@ -25,14 +25,12 @@ namespace pacman3.Models.Game
             protected set => _isActive = value;
         }
 
-        // ИСПРАВЛЕНО: Добавлен public set
         public virtual Color ObjectColor
         {
             get => _objectColor;
             set => _objectColor = value;
         }
 
-        // ИСПРАВЛЕНО: Добавлен public set
         public virtual double Size
         {
             get => _size;
@@ -72,7 +70,7 @@ namespace pacman3.Models.Game
 
         public virtual void OnCollision(ICollidable other)
         {
-            // Базовая реализация
+
         }
 
         public virtual void Draw(DrawingContext drawingContext)
