@@ -71,25 +71,29 @@ namespace pacman3.Models
             Score = 0;
             IsMoving = false;
             IsInvulnerable = false;
-            Velocity = new Vector2(0, 0); // Используем конструктор вместо Zero
+            Velocity = new Vector2(0, 0);
         }
 
         public void HandleInput(Key key)
         {
-            Direction newDirection = Direction;
+            Direction newDirection = Direction.None;
 
             switch (key)
             {
                 case Key.Up:
+                case Key.W:
                     newDirection = Direction.Up;
                     break;
                 case Key.Down:
+                case Key.S:
                     newDirection = Direction.Down;
                     break;
                 case Key.Left:
+                case Key.A:
                     newDirection = Direction.Left;
                     break;
                 case Key.Right:
+                case Key.D:
                     newDirection = Direction.Right;
                     break;
             }
@@ -169,7 +173,7 @@ namespace pacman3.Models
                     Velocity = new Vector2((float)Speed, 0);
                     break;
                 case Direction.None:
-                    Velocity = new Vector2(0, 0); // Используем конструктор
+                    Velocity = new Vector2(0, 0);
                     break;
             }
         }
@@ -231,7 +235,7 @@ namespace pacman3.Models
         {
             IsInvulnerable = true;
             _invulnerabilityEndTime = DateTime.Now.Add(duration);
-            ObjectColor = Color.FromRgb(255, 255, 200);
+            ObjectColor = Color.FromRgb(255, 255, 200); // Более светлый желтый
         }
 
         public void Die()
@@ -246,7 +250,7 @@ namespace pacman3.Models
             IsActive = true;
             Direction = Direction.None;
             NextDirection = Direction.None;
-            Velocity = new Vector2(0, 0); // Используем конструктор
+            Velocity = new Vector2(0, 0);
             IsMoving = false;
             BecomeInvulnerable(TimeSpan.FromSeconds(1.5));
         }
@@ -257,14 +261,14 @@ namespace pacman3.Models
             Score = 0;
             Direction = Direction.None;
             NextDirection = Direction.None;
-            Velocity = new Vector2(0, 0); // Используем конструктор
+            Velocity = new Vector2(0, 0);
             IsMoving = false;
             IsInvulnerable = false;
             IsActive = true;
             ObjectColor = Colors.Yellow;
         }
 
-        public override void Draw(DrawingContext drawingContext)
+        public override void Draw(System.Windows.Media.DrawingContext drawingContext)
         {
             if (!IsActive) return;
 
@@ -272,13 +276,73 @@ namespace pacman3.Models
             var pen = new Pen(Brushes.Black, 1);
 
             double halfSize = Size / 2;
-            drawingContext.DrawEllipse(
+
+            // Рисуем Pac-Man как сектор круга (открытый рот)
+            double mouthAngle = 45; // Угол открытия рта в градусах
+            double startAngle = GetMouthStartAngle(Direction);
+
+            drawingContext.DrawGeometry(
                 brush,
                 pen,
-                new System.Windows.Point(Position.X, Position.Y),
-                halfSize,
-                halfSize
+                CreatePacManGeometry(Position.X, Position.Y, halfSize, startAngle, mouthAngle)
             );
+        }
+
+        private double GetMouthStartAngle(Direction direction)
+        {
+            return direction switch
+            {
+                Direction.Right => 35,
+                Direction.Up => 125,
+                Direction.Left => 215,
+                Direction.Down => 305,
+                _ => 35 // По умолчанию смотрит вправо
+            };
+        }
+
+        private System.Windows.Media.Geometry CreatePacManGeometry(double centerX, double centerY, double radius, double startAngle, double mouthAngle)
+        {
+            var pathGeometry = new System.Windows.Media.PathGeometry();
+            var figure = new System.Windows.Media.PathFigure();
+
+            // Конвертируем углы в радианы
+            double startRad = (startAngle - mouthAngle / 2) * Math.PI / 180;
+            double endRad = (startAngle + mouthAngle / 2) * Math.PI / 180;
+
+            // Начальная точка (центр)
+            figure.StartPoint = new System.Windows.Point(centerX, centerY);
+
+            // Линия к началу дуги
+            figure.Segments.Add(new System.Windows.Media.LineSegment(
+                new System.Windows.Point(centerX + radius * Math.Cos(startRad),
+                                        centerY + radius * Math.Sin(startRad)),
+                true));
+
+            // Дуга
+            figure.Segments.Add(new System.Windows.Media.ArcSegment(
+                new System.Windows.Point(centerX + radius * Math.Cos(endRad),
+                                        centerY + radius * Math.Sin(endRad)),
+                new System.Windows.Size(radius, radius),
+                0,
+                mouthAngle > 180,
+                System.Windows.Media.SweepDirection.Clockwise,
+                true));
+
+            // Замыкаем фигуру
+            figure.IsClosed = true;
+            pathGeometry.Figures.Add(figure);
+
+            return pathGeometry;
+        }
+
+        public override void OnCollision(Interfaces.ICollidable other)
+        {
+            base.OnCollision(other);
+
+            if (other is Models.Items.GamePoint gamePoint)
+            {
+                CollectPoint(gamePoint.PointValue);
+            }
         }
     }
 }

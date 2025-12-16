@@ -165,22 +165,59 @@ namespace pacman3.Models.Game
 
         public void Update(TimeSpan gameTime)
         {
-            foreach (var point in _points)
-            {
-                point.Update(gameTime);
-            }
+            // Точки не требуют обновления
         }
 
         public void Draw(System.Windows.Media.DrawingContext drawingContext)
         {
+            // Рисуем фон
+            drawingContext.DrawRectangle(
+                System.Windows.Media.Brushes.Black,
+                null,
+                new Rect(0, 0, Width * TileSize, Height * TileSize)
+            );
+
+            // Рисуем стены
             foreach (var wall in _walls)
             {
                 wall.Draw(drawingContext);
             }
 
+            // Рисуем точки
             foreach (var point in _points)
             {
                 point.Draw(drawingContext);
+            }
+
+            // Рисуем сетку (для отладки)
+            DrawGrid(drawingContext);
+        }
+
+        private void DrawGrid(System.Windows.Media.DrawingContext drawingContext)
+        {
+            var gridPen = new System.Windows.Media.Pen(
+                System.Windows.Media.Brushes.DarkGray,
+                0.5
+            );
+
+            // Вертикальные линии
+            for (int x = 0; x <= Width; x++)
+            {
+                drawingContext.DrawLine(
+                    gridPen,
+                    new System.Windows.Point(x * TileSize, 0),
+                    new System.Windows.Point(x * TileSize, Height * TileSize)
+                );
+            }
+
+            // Горизонтальные линии
+            for (int y = 0; y <= Height; y++)
+            {
+                drawingContext.DrawLine(
+                    gridPen,
+                    new System.Windows.Point(0, y * TileSize),
+                    new System.Windows.Point(Width * TileSize, y * TileSize)
+                );
             }
         }
     }

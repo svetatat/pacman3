@@ -22,7 +22,7 @@ namespace pacman3.Models.Game
         public bool IsActive
         {
             get => _isActive;
-            protected set => _isActive = value;
+            set => _isActive = value; // Изменено с protected на public set
         }
 
         public virtual Color ObjectColor
@@ -70,7 +70,7 @@ namespace pacman3.Models.Game
 
         public virtual void OnCollision(ICollidable other)
         {
-
+            // Базовая реализация может быть пустой
         }
 
         public virtual void Draw(DrawingContext drawingContext)

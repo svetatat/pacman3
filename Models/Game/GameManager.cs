@@ -24,6 +24,8 @@ namespace pacman3.Models.Game
         private List<Ghost> _ghosts;
         private bool _isEnergizerActive;
         private DateTime _energizerEndTime;
+        private int _currentLevel = 1;
+        private Vector2 _playerSpawnPoint;
 
         public GameState CurrentState
         {
@@ -37,6 +39,7 @@ namespace pacman3.Models.Game
 
         public int Score => _player?.Score ?? 0;
         public int Lives => _player?.Lives ?? 0;
+        public int Level => _currentLevel;
 
         // События
         public event EventHandler<GameState> GameStateChanged;
@@ -44,13 +47,15 @@ namespace pacman3.Models.Game
         public event EventHandler<int> LivesChanged;
         public event EventHandler GameOver;
         public event EventHandler Victory;
+        public event EventHandler<int> LevelChanged;
 
         public void Initialize()
         {
             _gameField = new GameField(10, 10);
             _gameField.Initialize();
 
-            _player = new Player(5 * 32 + 16, 5 * 32 + 16);
+            _playerSpawnPoint = new Vector2(5 * 32 + 16, 5 * 32 + 16);
+            _player = new Player(_playerSpawnPoint.X, _playerSpawnPoint.Y);
             _player.ScoreChanged += (s, score) => ScoreChanged?.Invoke(this, score);
             _player.LivesChanged += (s, lives) => LivesChanged?.Invoke(this, lives);
             _player.PlayerDied += OnPlayerDied;
@@ -63,7 +68,7 @@ namespace pacman3.Models.Game
                 Victory?.Invoke(this, EventArgs.Empty);
             };
 
-            CurrentState = GameState.Playing;
+            CurrentState = GameState.MainMenu;
         }
 
         private void InitializeGhosts()
@@ -76,7 +81,7 @@ namespace pacman3.Models.Game
                 new ClydeGhost()
             };
 
-            // Установите позиции отдельно
+            // Установите позиции
             _ghosts[0].Position = new Vector2(9 * 32 + 16, 9 * 32 + 16); // Blinky
             _ghosts[1].Position = new Vector2(1 * 32 + 16, 1 * 32 + 16); // Pinky
             _ghosts[2].Position = new Vector2(9 * 32 + 16, 1 * 32 + 16); // Inky
@@ -90,12 +95,18 @@ namespace pacman3.Models.Game
             // Обновление поля
             _gameField.Update(gameTime);
 
+            // Проверка сбора точек игроком
+            CheckPointCollection();
+
             // Обновление привидений
             foreach (var ghost in _ghosts)
             {
-                ghost.TargetPosition = ghost.CalculateTargetPosition(_player.Position, _player.Direction);
-                UpdateGhostDirection(ghost);
-                ghost.Update(gameTime);
+                if (ghost.IsActive)
+                {
+                    ghost.TargetPosition = ghost.CalculateTargetPosition(_player.Position, _player.Direction);
+                    UpdateGhostDirection(ghost);
+                    ghost.Update(gameTime);
+                }
             }
 
             // Обновление игрока
@@ -107,11 +118,25 @@ namespace pacman3.Models.Game
                 _player.Update(gameTime);
             }
 
-            // Проверка столкновений (упрощенная версия)
+            // Проверка столкновений
             CheckCollisions();
 
             // Проверка энергии
             CheckEnergizerStatus();
+        }
+
+        private void CheckPointCollection()
+        {
+            var point = _gameField.GetPointAt(_player.Position);
+            if (point != null && !point.IsCollected)
+            {
+                point.OnCollision(_player);
+
+                if (point is Models.Items.Energizer)
+                {
+                    ActivateEnergizer(TimeSpan.FromSeconds(10));
+                }
+            }
         }
 
         private void CheckCollisions()
@@ -119,6 +144,8 @@ namespace pacman3.Models.Game
             // Проверка столкновений с привидениями
             foreach (var ghost in _ghosts)
             {
+                if (!ghost.IsActive) continue;
+
                 if (IsColliding(_player, ghost))
                 {
                     if (ghost.State == GhostState.Vulnerable)
@@ -131,6 +158,12 @@ namespace pacman3.Models.Game
                     {
                         // Привидение вредит игроку
                         _player.TakeDamage();
+
+                        if (_player.Lives <= 0)
+                        {
+                            CurrentState = GameState.GameOver;
+                            GameOver?.Invoke(this, EventArgs.Empty);
+                        }
                     }
                 }
             }
@@ -147,7 +180,8 @@ namespace pacman3.Models.Game
 
         private void UpdateGhostDirection(Ghost ghost)
         {
-            // Простой AI для привидений
+            if (!ghost.IsActive) return;
+
             var possibleDirections = new List<Direction>
             {
                 Direction.Up, Direction.Down, Direction.Left, Direction.Right
@@ -173,6 +207,13 @@ namespace pacman3.Models.Game
                 _gameField.CanMoveTo(ghost.Position, bestDirection, ghost.Speed))
             {
                 ghost.Direction = bestDirection;
+            }
+            else if (possibleDirections.Count > 0)
+            {
+                // Выбираем случайное доступное направление
+                var random = new Random();
+                int index = random.Next(possibleDirections.Count);
+                ghost.Direction = possibleDirections[index];
             }
         }
 
@@ -250,18 +291,30 @@ namespace pacman3.Models.Game
 
         public void RestartGame()
         {
+            _currentLevel = 1;
             Initialize();
+            CurrentState = GameState.Playing;
         }
 
         private void ResetLevel()
         {
             // Сброс позиций
-            _player.Respawn(new Vector2(5 * 32 + 16, 5 * 32 + 16));
+            _player.Respawn(_playerSpawnPoint);
 
             foreach (var ghost in _ghosts)
             {
                 ghost.Respawn(ghost.Position);
+                ghost.State = GhostState.Normal;
+                ghost.IsActive = true; // Теперь это будет работать
             }
+        }
+
+        public void NextLevel()
+        {
+            _currentLevel++;
+            LevelChanged?.Invoke(this, _currentLevel);
+            ResetLevel();
+            // TODO: Загрузка нового уровня
         }
 
         public Player GetPlayer() => _player;
