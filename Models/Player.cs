@@ -13,7 +13,6 @@ namespace pacman3.Models
         private int _score;
         private Direction _nextDirection;
 
-        // Реализация свойства Velocity из интерфейса IMovable
         public Vector2 Velocity { get; set; }
 
         public int Lives
@@ -36,7 +35,7 @@ namespace pacman3.Models
             }
         }
 
-        public double Speed { get; set; } = 3.0;
+        public double Speed { get; set; } = 4.0;
         public Direction Direction { get; set; } = Direction.None;
 
         public Direction NextDirection
@@ -65,7 +64,7 @@ namespace pacman3.Models
 
         private void InitializePlayer()
         {
-            Size = 24; // Уменьшили размер для лучшего прохождения
+            Size = 24;
             ObjectColor = Colors.Yellow;
             Lives = 3;
             Score = 0;
@@ -106,33 +105,11 @@ namespace pacman3.Models
             }
         }
 
-        // Реализация метода Move из интерфейса IMovable
-        public void Move(Vector2 direction)
-        {
-            // Проверяем, является ли direction нулевым
-            if (direction.X == 0 && direction.Y == 0) return;
-
-            // Обновляем Velocity на основе направления и скорости
-            Velocity = new Vector2(
-                direction.X * (float)Speed,
-                direction.Y * (float)Speed
-            );
-
-            Vector2 newPosition = new Vector2(
-                Position.X + Velocity.X,
-                Position.Y + Velocity.Y
-            );
-
-            Position = newPosition;
-            IsMoving = true;
-        }
-
-        // Основной метод движения с проверкой стены
         public void Move(GameField gameField)
         {
             if (!IsActive || gameField == null) return;
 
-            // Проверяем, можем ли повернуть в желаемом направлении
+            // Проверяем, можем ли повернуть
             if (NextDirection != Direction.None && NextDirection != Direction)
             {
                 if (gameField.CanMoveTo(Position, NextDirection, Speed))
@@ -142,7 +119,7 @@ namespace pacman3.Models
                 }
             }
 
-            // Двигаемся в текущем направлении, если это возможно
+            // Двигаемся в текущем направлении
             if (Direction != Direction.None && gameField.CanMoveTo(Position, Direction, Speed))
             {
                 Vector2 newPosition = Position;
@@ -164,42 +141,14 @@ namespace pacman3.Models
                 }
 
                 Position = newPosition;
-
-                // Обновляем Velocity в соответствии с направлением
-                UpdateVelocityFromDirection();
-
                 IsMoving = true;
 
-                // Проверяем телепортацию через туннели
+                // Телепортация
                 gameField.CheckTeleport(this);
             }
             else
             {
-                // Если не можем двигаться, останавливаемся
                 IsMoving = false;
-                Velocity = new Vector2(0, 0);
-            }
-        }
-
-        private void UpdateVelocityFromDirection()
-        {
-            switch (Direction)
-            {
-                case Direction.Up:
-                    Velocity = new Vector2(0, -(float)Speed);
-                    break;
-                case Direction.Down:
-                    Velocity = new Vector2(0, (float)Speed);
-                    break;
-                case Direction.Left:
-                    Velocity = new Vector2(-(float)Speed, 0);
-                    break;
-                case Direction.Right:
-                    Velocity = new Vector2((float)Speed, 0);
-                    break;
-                case Direction.None:
-                    Velocity = new Vector2(0, 0);
-                    break;
             }
         }
 
@@ -246,7 +195,7 @@ namespace pacman3.Models
         {
             IsInvulnerable = true;
             _invulnerabilityEndTime = DateTime.Now.Add(duration);
-            ObjectColor = Color.FromRgb(255, 255, 200); // Более светлый желтый
+            ObjectColor = Color.FromRgb(255, 255, 150); // Светло-желтый
         }
 
         public void Die()
@@ -288,77 +237,40 @@ namespace pacman3.Models
 
             double halfSize = Size / 2;
 
-            // Рисуем Pac-Man как сектор круга (открытый рот)
-            double mouthAngle = 45; // Угол открытия рта в градусах
-            double startAngle = GetMouthStartAngle(Direction);
+            // Просто рисуем круг - это нормально для Pac-Man
+            drawingContext.DrawEllipse(
+                brush,
+                pen,
+                new System.Windows.Point(Position.X, Position.Y),
+                halfSize,
+                halfSize
+            );
 
-            // Если стоит на месте - рисуем полный круг
-            if (Direction == Direction.None || !IsMoving)
-            {
-                drawingContext.DrawEllipse(
-                    brush,
-                    pen,
-                    new System.Windows.Point(Position.X, Position.Y),
-                    halfSize,
-                    halfSize
-                );
-            }
-            else
-            {
-                // Рисуем Pac-Man с открытым ртом
-                drawingContext.DrawGeometry(
-                    brush,
-                    pen,
-                    CreatePacManGeometry(Position.X, Position.Y, halfSize, startAngle, mouthAngle)
-                );
-            }
+            // Рисуем глаз
+            DrawEye(drawingContext);
         }
 
-        private double GetMouthStartAngle(Direction direction)
+        private void DrawEye(System.Windows.Media.DrawingContext drawingContext)
         {
-            return direction switch
+            var eyeBrush = new SolidColorBrush(Colors.Black);
+            double eyeSize = Size / 6;
+
+            System.Windows.Point eyePosition = Direction switch
             {
-                Direction.Right => 35,
-                Direction.Up => 125,
-                Direction.Left => 215,
-                Direction.Down => 305,
-                _ => 35 // По умолчанию смотрит вправо
+                Direction.Right => new System.Windows.Point(Position.X + Size / 4, Position.Y - Size / 6),
+                Direction.Left => new System.Windows.Point(Position.X - Size / 4, Position.Y - Size / 6),
+                Direction.Up => new System.Windows.Point(Position.X, Position.Y - Size / 4),
+                Direction.Down => new System.Windows.Point(Position.X, Position.Y + Size / 4),
+                _ => new System.Windows.Point(Position.X + Size / 4, Position.Y - Size / 6) // По умолчанию
             };
-        }
 
-        private System.Windows.Media.Geometry CreatePacManGeometry(double centerX, double centerY, double radius, double startAngle, double mouthAngle)
-        {
-            var pathGeometry = new System.Windows.Media.PathGeometry();
-            var figure = new System.Windows.Media.PathFigure();
-
-            // Конвертируем углы в радианы
-            double startRad = (startAngle - mouthAngle / 2) * Math.PI / 180;
-            double endRad = (startAngle + mouthAngle / 2) * Math.PI / 180;
-
-            // Начальная точка (центр)
-            figure.StartPoint = new System.Windows.Point(centerX, centerY);
-
-            // Линия к началу дуги
-            figure.Segments.Add(new System.Windows.Media.LineSegment(
-                new System.Windows.Point(centerX + radius * Math.Cos(startRad),
-                                        centerY + radius * Math.Sin(startRad)),
-                true));
-
-            // Дуга
-            figure.Segments.Add(new System.Windows.Media.ArcSegment(
-                new System.Windows.Point(centerX + radius * Math.Cos(endRad),
-                                        centerY + radius * Math.Sin(endRad)),
-                new System.Windows.Size(radius, radius),
-                0,
-                mouthAngle > 180,
-                System.Windows.Media.SweepDirection.Clockwise,
-                true));
-
-            // Замыкаем фигуру
-            figure.IsClosed = true;
-            pathGeometry.Figures.Add(figure);
-
-            return pathGeometry;
+            drawingContext.DrawEllipse(
+                eyeBrush,
+                null,
+                eyePosition,
+                eyeSize,
+                eyeSize
+            );
         }
 
         public override void OnCollision(Interfaces.ICollidable other)
@@ -369,6 +281,25 @@ namespace pacman3.Models
             {
                 CollectPoint(gamePoint.PointValue);
             }
+        }
+
+        // Реализация интерфейса IMovable
+        public void Move(Vector2 direction)
+        {
+            if (direction.X == 0 && direction.Y == 0) return;
+
+            Velocity = new Vector2(
+                direction.X * (float)Speed,
+                direction.Y * (float)Speed
+            );
+
+            Vector2 newPosition = new Vector2(
+                Position.X + Velocity.X,
+                Position.Y + Velocity.Y
+            );
+
+            Position = newPosition;
+            IsMoving = true;
         }
     }
 }

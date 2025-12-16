@@ -1,4 +1,5 @@
-﻿using System.Windows.Media;
+﻿using System;
+using System.Windows.Media;
 
 namespace pacman3.Models.Items
 {
@@ -15,23 +16,30 @@ namespace pacman3.Models.Items
             ObjectColor = Colors.Pink;
             PointValue = 50;
             Type = PointType.Energizer;
+            IsActive = true;
         }
 
         public override void Collect()
         {
             base.Collect();
+            System.Diagnostics.Debug.WriteLine("Энерджайзер собран!");
         }
 
         public override void Draw(System.Windows.Media.DrawingContext drawingContext)
         {
-            if (IsCollected) return;
+            if (IsCollected || !IsActive) return;
 
-            var brush = new SolidColorBrush(ObjectColor);
-            var pen = new Pen(Brushes.Transparent, 0);
+            // Мигающий эффект
+            var time = DateTime.Now.Millisecond;
+            var alpha = (byte)(128 + 127 * Math.Sin(time * 0.01));
+            var color = Color.FromArgb(alpha, ObjectColor.R, ObjectColor.G, ObjectColor.B);
+
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
 
             drawingContext.DrawEllipse(
                 brush,
-                pen,
+                null,
                 new System.Windows.Point(Position.X, Position.Y),
                 Size / 2,
                 Size / 2

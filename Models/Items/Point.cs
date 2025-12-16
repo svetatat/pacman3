@@ -12,16 +12,23 @@ namespace pacman3.Models.Items
         public bool IsCollected
         {
             get => _isCollected;
-            private set => _isCollected = value;
+            set // Изменено с private на public
+            {
+                if (_isCollected != value)
+                {
+                    _isCollected = value;
+                    IsActive = !value; // Деактивируем объект при сборе
+                }
+            }
         }
 
         public int PointValue
         {
             get => _pointValue;
-            protected set => _pointValue = value;
+            set => _pointValue = value; // Изменено с protected на public
         }
 
-        public PointType Type { get; protected set; }
+        public PointType Type { get; set; } // Изменено с protected на public
 
         public event System.EventHandler PointCollected;
 
@@ -37,6 +44,7 @@ namespace pacman3.Models.Items
             IsCollected = false;
             PointValue = 10;
             Type = PointType.Regular;
+            IsActive = true;
         }
 
         public virtual void Collect()
@@ -44,30 +52,32 @@ namespace pacman3.Models.Items
             if (IsCollected) return;
 
             IsCollected = true;
-            IsActive = false;
             PointCollected?.Invoke(this, System.EventArgs.Empty);
+
+            System.Diagnostics.Debug.WriteLine($"Точка собрана! Очки: {PointValue}");
         }
 
         public override void OnCollision(Interfaces.ICollidable other)
         {
             base.OnCollision(other);
 
-            if (other is Player)
+            if (other is Player player)
             {
                 Collect();
+                player.CollectPoint(PointValue);
             }
         }
 
         public override void Draw(System.Windows.Media.DrawingContext drawingContext)
         {
-            if (IsCollected) return;
+            if (IsCollected || !IsActive) return;
 
             var brush = new SolidColorBrush(ObjectColor);
-            var pen = new Pen(Brushes.Transparent, 0);
+            brush.Freeze();
 
             drawingContext.DrawEllipse(
                 brush,
-                pen,
+                null,
                 new System.Windows.Point(Position.X, Position.Y),
                 Size / 2,
                 Size / 2

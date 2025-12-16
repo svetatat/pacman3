@@ -9,14 +9,13 @@ namespace pacman3.Models.Game
 {
     public class GameManager : Interfaces.IGameComponent
     {
-        private GameState _currentState = GameState.MainMenu;
+        private GameState _currentState = GameState.Playing;
         private Player _player;
         private GameField _gameField;
         private List<Ghost> _ghosts;
         private bool _isEnergizerActive;
         private DateTime _energizerEndTime;
         private int _currentLevel = 1;
-        private Vector2 _playerSpawnPoint;
 
         public GameState CurrentState
         {
@@ -42,12 +41,11 @@ namespace pacman3.Models.Game
 
         public void Initialize()
         {
-            _gameField = new GameField(19, 21);
+            _gameField = new GameField();
             _gameField.Initialize();
 
-            // Точка спавна Pac-Man (посередине внизу)
-            _playerSpawnPoint = new Vector2(9 * 32 + 16, 15 * 32 + 16);
-            _player = new Player(_playerSpawnPoint.X, _playerSpawnPoint.Y);
+            // Используем точку спавна из GameField
+            _player = new Player(_gameField.PlayerSpawn.X, _gameField.PlayerSpawn.Y);
             _player.ScoreChanged += (s, score) => ScoreChanged?.Invoke(this, score);
             _player.LivesChanged += (s, lives) => LivesChanged?.Invoke(this, lives);
             _player.PlayerDied += OnPlayerDied;
@@ -60,7 +58,7 @@ namespace pacman3.Models.Game
                 Victory?.Invoke(this, EventArgs.Empty);
             };
 
-            CurrentState = GameState.Playing; // Начинаем сразу играть
+            CurrentState = GameState.Playing;
         }
 
         private void InitializeGhosts()
@@ -73,21 +71,18 @@ namespace pacman3.Models.Game
                 new ClydeGhost()
             };
 
-            // Установите позиции привидений в центре карты
-            _ghosts[0].Position = new Vector2(9 * 32 + 16, 9 * 32 + 16); // Blinky
-            _ghosts[1].Position = new Vector2(8 * 32 + 16, 9 * 32 + 16); // Pinky
-            _ghosts[2].Position = new Vector2(10 * 32 + 16, 9 * 32 + 16); // Inky
-            _ghosts[3].Position = new Vector2(9 * 32 + 16, 8 * 32 + 16); // Clyde
+            // Ставим привидений в дом призраков с небольшим смещением
+            _ghosts[0].Position = new Vector2(_gameField.GhostHouse.X - 32, _gameField.GhostHouse.Y);
+            _ghosts[1].Position = new Vector2(_gameField.GhostHouse.X + 32, _gameField.GhostHouse.Y);
+            _ghosts[2].Position = new Vector2(_gameField.GhostHouse.X, _gameField.GhostHouse.Y - 32);
+            _ghosts[3].Position = new Vector2(_gameField.GhostHouse.X, _gameField.GhostHouse.Y + 32);
         }
 
         public void Update(TimeSpan gameTime)
         {
             if (CurrentState != GameState.Playing) return;
 
-            // Обновление поля
-            _gameField.Update(gameTime);
-
-            // Проверка сбора точек игроком
+            // Проверка сбора точек
             CheckPointCollection();
 
             // Обновление игрока
@@ -128,7 +123,6 @@ namespace pacman3.Models.Game
 
         private void CheckCollisions()
         {
-            // Проверка столкновений с привидениями
             foreach (var ghost in _ghosts)
             {
                 if (!ghost.IsActive) continue;
@@ -137,13 +131,11 @@ namespace pacman3.Models.Game
                 {
                     if (ghost.State == GhostState.Vulnerable)
                     {
-                        // Игрок съедает привидение
                         ghost.Die();
                         _player.AddScore(200);
                     }
                     else if (ghost.State == GhostState.Normal)
                     {
-                        // Привидение вредит игроку
                         _player.TakeDamage();
 
                         if (_player.Lives <= 0)
@@ -153,7 +145,6 @@ namespace pacman3.Models.Game
                         }
                         else
                         {
-                            // Перезапуск уровня после потери жизни
                             ResetLevel();
                         }
                     }
@@ -182,7 +173,6 @@ namespace pacman3.Models.Game
                     if (ghost.State == GhostState.Vulnerable)
                     {
                         ghost.State = GhostState.Normal;
-                        ghost.Speed = 2.0; // Восстанавливаем скорость
                     }
                 }
             }
@@ -190,7 +180,6 @@ namespace pacman3.Models.Game
 
         private void OnPlayerDied(object sender, EventArgs e)
         {
-            // Перезапуск уровня при смерти
             ResetLevel();
         }
 
@@ -227,21 +216,20 @@ namespace pacman3.Models.Game
         public void RestartGame()
         {
             _currentLevel = 1;
+            _gameField.ResetField();
             Initialize();
             CurrentState = GameState.Playing;
         }
 
         private void ResetLevel()
         {
-            // Сброс позиций
-            _player.Respawn(_playerSpawnPoint);
+            _player.Respawn(_gameField.PlayerSpawn);
 
             foreach (var ghost in _ghosts)
             {
                 ghost.Respawn(ghost.Position);
                 ghost.State = GhostState.Normal;
                 ghost.IsActive = true;
-                ghost.Speed = 2.0;
             }
         }
 

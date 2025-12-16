@@ -114,6 +114,13 @@ namespace pacman3
 
             // Обновляем UI информацию
             UpdateGameInfo();
+
+            // Отладочная информация
+            var gameFieldInfo = _gameManager.GetGameField();
+            if (gameFieldInfo != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Точек на поле: {gameFieldInfo.Points.Count}, собрано: {gameFieldInfo.Points.Count(p => p.IsCollected)}");
+            }
         }
 
         private void DrawUI(DrawingContext drawingContext)

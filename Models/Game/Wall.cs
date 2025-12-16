@@ -33,17 +33,25 @@ namespace pacman3.Models.Game
         public override void Draw(DrawingContext drawingContext)
         {
             var brush = new SolidColorBrush(ObjectColor);
-            var pen = new Pen(Brushes.DarkBlue, 2);
+            brush.Freeze();
 
-            drawingContext.DrawRectangle(
+            var pen = new Pen(Brushes.DarkBlue, 2);
+            pen.Freeze();
+
+            // Рисуем стену с закругленными углами
+            var rect = new Rect(
+                Position.X - Width / 2 + 2,
+                Position.Y - Height / 2 + 2,
+                Width - 4,
+                Height - 4
+            );
+
+            drawingContext.DrawRoundedRectangle(
                 brush,
                 pen,
-                new Rect(
-                    Position.X - Width / 2,
-                    Position.Y - Height / 2,
-                    Width,
-                    Height
-                )
+                rect,
+                5, // Радиус скругления
+                5
             );
         }
     }
