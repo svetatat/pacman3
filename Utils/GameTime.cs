@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PacManGame.Utils
+namespace pacman3.Utils
 {
     /// <summary>
     /// Класс для отслеживания игрового времени

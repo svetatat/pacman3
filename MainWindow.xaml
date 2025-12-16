@@ -5,8 +5,43 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:pacman3"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="Pac-Man Game - Sprint 1" 
+        Height="600" 
+        Width="800"
+        WindowStartupLocation="CenterScreen">
 
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <Border Grid.Row="0" Background="DarkBlue" Padding="10">
+            <TextBlock Text="PAC-MAN Game Development" 
+                      Foreground="Yellow"
+                      FontSize="24"
+                      FontWeight="Bold"
+                      HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- Область для тестирования -->
+        <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="10">
+            <Canvas x:Name="TestCanvas" Background="Black">
+                <!-- Здесь будет тестовая отрисовка -->
+            </Canvas>
+        </Border>
+
+        <!-- Статус -->
+        <StatusBar Grid.Row="2" Background="LightGray">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="Спринт 1: Базовая структура создана"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <TextBlock Text="Интерфейсы: ✅ | Базовый класс: ✅"/>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
