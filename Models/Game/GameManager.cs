@@ -64,25 +64,26 @@ namespace pacman3.Models.Game
         private void InitializeGhosts()
         {
             _ghosts = new List<Ghost>
-            {
-                new BlinkyGhost(),
-                new PinkyGhost(),
-                new InkyGhost(),
-                new ClydeGhost()
-            };
+    {
+        new BlinkyGhost(),
+        new PinkyGhost(),
+        new InkyGhost(),
+        new ClydeGhost()
+    };
 
-            // Ставим привидений в дом призраков
+            // Ставим привидений ВНУТРИ дома призраков
             var ghostHouse = _gameField.GhostHouse;
-            _ghosts[0].Position = new Vector2(ghostHouse.X - 32, ghostHouse.Y);
-            _ghosts[1].Position = new Vector2(ghostHouse.X + 32, ghostHouse.Y);
-            _ghosts[2].Position = new Vector2(ghostHouse.X, ghostHouse.Y - 32);
-            _ghosts[3].Position = new Vector2(ghostHouse.X, ghostHouse.Y + 32);
+            _ghosts[0].Position = new Vector2(ghostHouse.X - 48, ghostHouse.Y - 16);
+            _ghosts[1].Position = new Vector2(ghostHouse.X + 48, ghostHouse.Y - 16);
+            _ghosts[2].Position = new Vector2(ghostHouse.X - 16, ghostHouse.Y + 16);
+            _ghosts[3].Position = new Vector2(ghostHouse.X + 16, ghostHouse.Y + 16);
 
             foreach (var ghost in _ghosts)
             {
                 ghost.State = GhostState.Normal;
                 ghost.IsActive = true;
                 ghost.SetGameField(_gameField);
+                ghost.Direction = Direction.Down; // Направление для выхода
             }
         }
 

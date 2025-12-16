@@ -34,7 +34,7 @@ namespace pacman3.Models.Game
 
         public GameField()
         {
-            Width = 19; // Уменьшим для простоты
+            Width = 19;
             Height = 21;
             _points = new List<GamePoint>();
             _walls = new List<Wall>();
@@ -56,10 +56,10 @@ namespace pacman3.Models.Game
                 (Height - 3) * TileSize + TileSize / 2
             );
 
-            // Дом призраков в центре
+            // Дом призраков в центре (БОЛЬШЕ!)
             GhostHouse = new Vector2(
                 Width / 2 * TileSize + TileSize / 2,
-                10 * TileSize + TileSize / 2
+                8 * TileSize + TileSize / 2
             );
 
             // Очищаем все списки
@@ -73,8 +73,8 @@ namespace pacman3.Models.Game
             // 2. Простой лабиринт внутри
             CreateSimpleMaze();
 
-            // 3. Дом призраков (с выходом!)
-            CreateGhostHouseWithExit();
+            // 3. Дом призраков (БОЛЬШОЙ с выходами!)
+            CreateBigGhostHouse();
 
             // 4. Точки везде, где можно пройти
             CreateDots();
@@ -97,91 +97,95 @@ namespace pacman3.Models.Game
                 AddWall(x, Height - 1);
             }
 
-            // Левая стена
+            // Левая стена (кроме туннеля)
             for (int y = 1; y < Height - 1; y++)
             {
-                AddWall(0, y);
+                if (y < Height / 2 - 1 || y > Height / 2 + 2)
+                    AddWall(0, y);
             }
 
-            // Правая стена
+            // Правая стена (кроме туннеля)
             for (int y = 1; y < Height - 1; y++)
             {
-                AddWall(Width - 1, y);
+                if (y < Height / 2 - 1 || y > Height / 2 + 2)
+                    AddWall(Width - 1, y);
             }
-
-            // Туннели - отверстия в левой и правой стенах
-            RemoveWall(0, Height / 2); // Левое отверстие
-            RemoveWall(0, Height / 2 + 1);
-            RemoveWall(Width - 1, Height / 2); // Правое отверстие
-            RemoveWall(Width - 1, Height / 2 + 1);
         }
 
         private void CreateSimpleMaze()
         {
-            // Вертикальные перегородки
-            for (int y = 3; y < 8; y++)
+            // Упрощенный лабиринт - больше проходов
+            for (int y = 2; y < 7; y++)
             {
-                AddWall(4, y);
-                AddWall(Width - 5, y);
+                AddWall(3, y);
+                AddWall(Width - 4, y);
             }
 
-            // Горизонтальные перегородки
-            for (int x = 6; x < Width - 6; x++)
+            for (int x = 5; x < Width - 5; x++)
             {
-                AddWall(x, 5);
-                AddWall(x, Height - 6);
+                AddWall(x, 4);
+                AddWall(x, Height - 5);
             }
 
-            // Несколько блоков
-            AddWall(7, 8);
-            AddWall(8, 8);
-            AddWall(9, 8);
+            // Небольшие препятствия
+            AddWall(7, 7);
+            AddWall(8, 7);
+            AddWall(Width - 8, 7);
+            AddWall(Width - 9, 7);
 
-            AddWall(Width - 8, 8);
-            AddWall(Width - 9, 8);
-            AddWall(Width - 10, 8);
-
-            AddWall(Width / 2, 15);
-            AddWall(Width / 2 - 1, 15);
-            AddWall(Width / 2 + 1, 15);
+            AddWall(Width / 2, 12);
+            AddWall(Width / 2, 13);
         }
 
-        private void CreateGhostHouseWithExit()
+        private void CreateBigGhostHouse()
         {
             int centerX = Width / 2;
-            int houseY = 8; // Выше, чтобы было проще выйти
+            int houseY = 6; // Выше для большего пространства
+            int houseWidth = 7; // Ширина дома - 7 тайлов
+            int houseHeight = 5; // Высота дома - 5 тайлов
 
-            // Верхняя стена дома
-            for (int x = centerX - 2; x <= centerX + 2; x++)
+            // Очищаем область дома от стен
+            for (int x = centerX - houseWidth / 2; x <= centerX + houseWidth / 2; x++)
             {
-                AddWall(x, houseY - 2);
+                for (int y = houseY - houseHeight / 2; y <= houseY + houseHeight / 2; y++)
+                {
+                    RemoveWall(x, y);
+                }
             }
 
-            // Нижняя стена дома
-            for (int x = centerX - 2; x <= centerX + 2; x++)
+            // Верхняя стена дома
+            for (int x = centerX - houseWidth / 2; x <= centerX + houseWidth / 2; x++)
             {
-                AddWall(x, houseY + 2);
+                AddWall(x, houseY - houseHeight / 2);
+            }
+
+            // Нижняя стена дома (с БОЛЬШИМ выходом!)
+            for (int x = centerX - houseWidth / 2; x <= centerX + houseWidth / 2; x++)
+            {
+                // Оставляем большой проход в центре (3 тайла)
+                if (x < centerX - 1 || x > centerX + 1)
+                    AddWall(x, houseY + houseHeight / 2);
             }
 
             // Левая стена дома
-            AddWall(centerX - 2, houseY - 1);
-            AddWall(centerX - 2, houseY);
-            AddWall(centerX - 2, houseY + 1);
+            for (int y = houseY - houseHeight / 2 + 1; y < houseY + houseHeight / 2; y++)
+            {
+                AddWall(centerX - houseWidth / 2, y);
+            }
 
             // Правая стена дома
-            AddWall(centerX + 2, houseY - 1);
-            AddWall(centerX + 2, houseY);
-            AddWall(centerX + 2, houseY + 1);
-
-            // ВЫХОД из дома - ОЧЕНЬ ВАЖНО!
-            RemoveWall(centerX, houseY + 2); // Убираем нижнюю стену посередине
-            RemoveWall(centerX, houseY + 1); // И еще одну для хорошего прохода
-
-            // Проход снизу
-            for (int y = houseY + 3; y < houseY + 6; y++)
+            for (int y = houseY - houseHeight / 2 + 1; y < houseY + houseHeight / 2; y++)
             {
-                RemoveWall(centerX, y);
+                AddWall(centerX + houseWidth / 2, y);
             }
+
+            // Дополнительные проходы для выхода
+            RemoveWall(centerX - 1, houseY + houseHeight / 2 + 1);
+            RemoveWall(centerX, houseY + houseHeight / 2 + 1);
+            RemoveWall(centerX + 1, houseY + houseHeight / 2 + 1);
+            RemoveWall(centerX - 1, houseY + houseHeight / 2 + 2);
+            RemoveWall(centerX, houseY + houseHeight / 2 + 2);
+            RemoveWall(centerX + 1, houseY + houseHeight / 2 + 2);
         }
 
         private void CreateDots()
@@ -274,10 +278,12 @@ namespace pacman3.Models.Game
         private bool IsInGhostHouse(int gridX, int gridY)
         {
             int centerX = Width / 2;
-            int houseY = 8;
+            int houseY = 6;
+            int houseWidth = 7;
+            int houseHeight = 5;
 
-            return gridX >= centerX - 2 && gridX <= centerX + 2 &&
-                   gridY >= houseY - 2 && gridY <= houseY + 2;
+            return gridX >= centerX - houseWidth / 2 && gridX <= centerX + houseWidth / 2 &&
+                   gridY >= houseY - houseHeight / 2 && gridY <= houseY + houseHeight / 2;
         }
 
         private bool IsEnergizerSpot(int gridX, int gridY)
@@ -344,14 +350,14 @@ namespace pacman3.Models.Game
                 nextPosition.Y >= (Height / 2 - 1) * TileSize &&
                 nextPosition.Y <= (Height / 2 + 2) * TileSize)
             {
-                return true; // Разрешаем вход в туннель
+                return true;
             }
 
             if (nextPosition.X > Width * TileSize + TileSize / 2 &&
                 nextPosition.Y >= (Height / 2 - 1) * TileSize &&
                 nextPosition.Y <= (Height / 2 + 2) * TileSize)
             {
-                return true; // Разрешаем вход в туннель
+                return true;
             }
 
             // Проверка границ
@@ -403,6 +409,39 @@ namespace pacman3.Models.Game
             return null;
         }
 
+        public List<Direction> GetAvailableDirections(Vector2 position, Direction currentDirection)
+        {
+            var directions = new List<Direction>();
+
+            // Проверяем все 4 направления
+            if (CanMoveTo(position, Direction.Up, 1))
+                directions.Add(Direction.Up);
+            if (CanMoveTo(position, Direction.Down, 1))
+                directions.Add(Direction.Down);
+            if (CanMoveTo(position, Direction.Left, 1))
+                directions.Add(Direction.Left);
+            if (CanMoveTo(position, Direction.Right, 1))
+                directions.Add(Direction.Right);
+
+            // Убираем противоположное направление
+            var opposite = GetOppositeDirection(currentDirection);
+            directions.Remove(opposite);
+
+            return directions;
+        }
+
+        private Direction GetOppositeDirection(Direction dir)
+        {
+            return dir switch
+            {
+                Direction.Up => Direction.Down,
+                Direction.Down => Direction.Up,
+                Direction.Left => Direction.Right,
+                Direction.Right => Direction.Left,
+                _ => Direction.None
+            };
+        }
+
         public void Initialize()
         {
             // Уже инициализировано в конструкторе
@@ -442,6 +481,9 @@ namespace pacman3.Models.Game
 
             // Рисуем туннели
             DrawTunnels(drawingContext);
+
+            // Рисуем дом призраков (визуально)
+            DrawGhostHouse(drawingContext);
         }
 
         private void DrawTunnels(System.Windows.Media.DrawingContext drawingContext)
@@ -462,6 +504,28 @@ namespace pacman3.Models.Game
                 System.Windows.Media.Brushes.Black,
                 new System.Windows.Media.Pen(System.Windows.Media.Brushes.Blue, 2),
                 rightTunnel
+            );
+        }
+
+        private void DrawGhostHouse(System.Windows.Media.DrawingContext drawingContext)
+        {
+            int centerX = Width / 2;
+            int houseY = 6;
+            int houseWidth = 7;
+            int houseHeight = 5;
+
+            // Рисуем границы дома призраков (красные линии)
+            var houseRect = new Rect(
+                (centerX - houseWidth / 2) * TileSize + 4,
+                (houseY - houseHeight / 2) * TileSize + 4,
+                houseWidth * TileSize - 8,
+                houseHeight * TileSize - 8
+            );
+
+            drawingContext.DrawRectangle(
+                System.Windows.Media.Brushes.Transparent,
+                new System.Windows.Media.Pen(System.Windows.Media.Brushes.Red, 2),
+                houseRect
             );
         }
 
@@ -501,40 +565,6 @@ namespace pacman3.Models.Game
         public List<Wall> GetWalls()
         {
             return _walls;
-        }
-
-        // Новый метод для привидений - получить доступные направления
-        public List<Direction> GetAvailableDirections(Vector2 position, Direction currentDirection)
-        {
-            var directions = new List<Direction>();
-
-            // Проверяем все 4 направления
-            if (CanMoveTo(position, Direction.Up, 1))
-                directions.Add(Direction.Up);
-            if (CanMoveTo(position, Direction.Down, 1))
-                directions.Add(Direction.Down);
-            if (CanMoveTo(position, Direction.Left, 1))
-                directions.Add(Direction.Left);
-            if (CanMoveTo(position, Direction.Right, 1))
-                directions.Add(Direction.Right);
-
-            // Убираем противоположное направление (чтобы не ходить назад)
-            var opposite = GetOppositeDirection(currentDirection);
-            directions.Remove(opposite);
-
-            return directions;
-        }
-
-        private Direction GetOppositeDirection(Direction dir)
-        {
-            return dir switch
-            {
-                Direction.Up => Direction.Down,
-                Direction.Down => Direction.Up,
-                Direction.Left => Direction.Right,
-                Direction.Right => Direction.Left,
-                _ => Direction.None
-            };
         }
     }
 }
