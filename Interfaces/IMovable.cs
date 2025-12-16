@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace PacManGame.Models.Interfaces
+namespace pacman3.Interfaces
 {
     /// <summary>
     /// Интерфейс для перемещаемых объектов
