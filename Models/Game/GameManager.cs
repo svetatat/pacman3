@@ -71,11 +71,19 @@ namespace pacman3.Models.Game
                 new ClydeGhost()
             };
 
-            // Ставим привидений в дом призраков с небольшим смещением
-            _ghosts[0].Position = new Vector2(_gameField.GhostHouse.X - 32, _gameField.GhostHouse.Y);
-            _ghosts[1].Position = new Vector2(_gameField.GhostHouse.X + 32, _gameField.GhostHouse.Y);
-            _ghosts[2].Position = new Vector2(_gameField.GhostHouse.X, _gameField.GhostHouse.Y - 32);
-            _ghosts[3].Position = new Vector2(_gameField.GhostHouse.X, _gameField.GhostHouse.Y + 32);
+            // Ставим привидений в дом призраков
+            var ghostHouse = _gameField.GhostHouse;
+            _ghosts[0].Position = new Vector2(ghostHouse.X - 32, ghostHouse.Y);
+            _ghosts[1].Position = new Vector2(ghostHouse.X + 32, ghostHouse.Y);
+            _ghosts[2].Position = new Vector2(ghostHouse.X, ghostHouse.Y - 32);
+            _ghosts[3].Position = new Vector2(ghostHouse.X, ghostHouse.Y + 32);
+
+            foreach (var ghost in _ghosts)
+            {
+                ghost.State = GhostState.Normal;
+                ghost.IsActive = true;
+                ghost.SetGameField(_gameField);
+            }
         }
 
         public void Update(TimeSpan gameTime)
@@ -110,7 +118,7 @@ namespace pacman3.Models.Game
         private void CheckPointCollection()
         {
             var point = _gameField.GetPointAt(_player.Position);
-            if (point != null && !point.IsCollected)
+            if (point != null && !point.IsCollected && point.IsActive)
             {
                 point.OnCollision(_player);
 
@@ -129,26 +137,54 @@ namespace pacman3.Models.Game
 
                 if (IsColliding(_player, ghost))
                 {
-                    if (ghost.State == GhostState.Vulnerable)
-                    {
-                        ghost.Die();
-                        _player.AddScore(200);
-                    }
-                    else if (ghost.State == GhostState.Normal)
-                    {
-                        _player.TakeDamage();
+                    HandleGhostCollision(ghost);
+                }
+            }
+        }
 
-                        if (_player.Lives <= 0)
-                        {
-                            CurrentState = GameState.GameOver;
-                            GameOver?.Invoke(this, EventArgs.Empty);
-                        }
-                        else
-                        {
-                            ResetLevel();
-                        }
+        private void HandleGhostCollision(Ghost ghost)
+        {
+            try
+            {
+                if (ghost.State == GhostState.Vulnerable)
+                {
+                    // Игрок съедает привидение
+                    ghost.Die();
+                    _player.AddScore(200);
+
+                    // Временно деактивируем привидение
+                    ghost.IsActive = false;
+
+                    // Через 3 секунды возрождаем
+                    var timer = new System.Windows.Threading.DispatcherTimer();
+                    timer.Interval = TimeSpan.FromSeconds(3);
+                    timer.Tick += (s, e) =>
+                    {
+                        ghost.Respawn(_gameField.GhostHouse);
+                        timer.Stop();
+                    };
+                    timer.Start();
+                }
+                else if (ghost.State == GhostState.Normal)
+                {
+                    // Привидение вредит игроку
+                    _player.TakeDamage();
+
+                    if (_player.Lives <= 0)
+                    {
+                        CurrentState = GameState.GameOver;
+                        GameOver?.Invoke(this, EventArgs.Empty);
+                    }
+                    else
+                    {
+                        ResetLevel();
                     }
                 }
+                // Если призрак мертв - игрок просто проходит сквозь него
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка при обработке столкновения: {ex.Message}");
             }
         }
 
@@ -173,6 +209,7 @@ namespace pacman3.Models.Game
                     if (ghost.State == GhostState.Vulnerable)
                     {
                         ghost.State = GhostState.Normal;
+                        ghost.Speed = 2.0;
                     }
                 }
             }
@@ -190,7 +227,7 @@ namespace pacman3.Models.Game
 
             foreach (var ghost in _ghosts)
             {
-                if (ghost.State != GhostState.Dead)
+                if (ghost.State != GhostState.Dead && ghost.IsActive)
                 {
                     ghost.MakeVulnerable(duration);
                 }
@@ -227,9 +264,10 @@ namespace pacman3.Models.Game
 
             foreach (var ghost in _ghosts)
             {
-                ghost.Respawn(ghost.Position);
+                ghost.Respawn(_gameField.GhostHouse);
                 ghost.State = GhostState.Normal;
                 ghost.IsActive = true;
+                ghost.Speed = 2.0;
             }
         }
 
