@@ -44,18 +44,30 @@ namespace pacman3.Models.Game
 
         public void LoadTestLevel()
         {
+            // Упрощенная карта 19x21 с нормальными стенами
             var testLevel = new int[,]
             {
-                {1,1,1,1,1,1,1,1,1,1},
-                {1,2,2,2,2,1,2,2,2,1},
-                {1,3,1,1,2,1,2,1,3,1},
-                {1,2,1,2,2,2,2,1,2,1},
-                {1,2,2,2,1,1,2,2,2,1},
-                {1,1,2,1,1,1,1,2,1,1},
-                {1,2,2,2,1,1,2,2,2,1},
-                {1,2,1,2,2,2,2,1,2,1},
-                {1,3,1,1,2,1,2,1,3,1},
-                {1,1,1,1,1,1,1,1,1,1}
+                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+                {1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1},
+                {1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1},
+                {1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1},
+                {1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1},
+                {1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1},
+                {1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1},
+                {1,1,1,1,2,1,1,1,0,1,0,1,1,1,2,1,1,1,1},
+                {2,2,2,1,2,1,0,0,0,0,0,0,0,1,2,1,2,2,2},
+                {1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1},
+                {2,2,2,2,2,0,0,1,2,2,2,1,0,0,2,2,2,2,2},
+                {1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1},
+                {2,2,2,1,2,1,0,0,0,0,0,0,0,1,2,1,2,2,2},
+                {1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1},
+                {1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1},
+                {1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1},
+                {1,3,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,3,1},
+                {1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1},
+                {1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1},
+                {1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1},
+                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
             };
 
             LoadLevel(testLevel);
@@ -88,6 +100,9 @@ namespace pacman3.Models.Game
                             energizer.PointCollected += OnPointCollected;
                             _points.Add(energizer);
                             break;
+                        case 0:
+                            // Пустое пространство (туннели)
+                            break;
                     }
                 }
             }
@@ -103,13 +118,18 @@ namespace pacman3.Models.Game
             }
         }
 
-        public bool IsWallAt(Vector2 position)
+        public bool IsWallAt(Vector2 position, double radius = 12)
         {
-            var testRect = new Rect(position.X - TileSize / 4, position.Y - TileSize / 4, TileSize / 2, TileSize / 2);
+            var playerRect = new Rect(
+                position.X - radius,
+                position.Y - radius,
+                radius * 2,
+                radius * 2
+            );
 
             foreach (var wall in _walls)
             {
-                if (wall.Bounds.IntersectsWith(testRect))
+                if (wall.Bounds.IntersectsWith(playerRect))
                     return true;
             }
 
@@ -118,40 +138,59 @@ namespace pacman3.Models.Game
 
         public bool CanMoveTo(Vector2 position, Direction direction, double speed)
         {
-            Vector2 testPosition = position;
+            if (direction == Direction.None) return true;
+
+            // Проверяем следующую позицию
+            Vector2 nextPosition = position;
 
             switch (direction)
             {
                 case Direction.Up:
-                    testPosition.Y -= speed;
+                    nextPosition.Y -= speed;
                     break;
                 case Direction.Down:
-                    testPosition.Y += speed;
+                    nextPosition.Y += speed;
                     break;
                 case Direction.Left:
-                    testPosition.X -= speed;
+                    nextPosition.X -= speed;
                     break;
                 case Direction.Right:
-                    testPosition.X += speed;
+                    nextPosition.X += speed;
                     break;
-                case Direction.None:
-                    return true;
             }
 
-            return !IsWallAt(testPosition);
+            // Проверяем телепортацию через туннели
+            if (nextPosition.X < -20)
+            {
+                nextPosition.X = Width * TileSize + 20;
+            }
+            else if (nextPosition.X > Width * TileSize + 20)
+            {
+                nextPosition.X = -20;
+            }
+
+            // Проверяем, не выходит ли за границы
+            if (nextPosition.Y < 0 || nextPosition.Y > Height * TileSize)
+                return false;
+
+            return !IsWallAt(nextPosition);
         }
 
         public GamePoint GetPointAt(Vector2 position)
         {
-            var tolerance = TileSize / 3;
-
             foreach (var point in _points)
             {
-                if (!point.IsCollected &&
-                    Math.Abs(point.Position.X - position.X) < tolerance &&
-                    Math.Abs(point.Position.Y - position.Y) < tolerance)
+                if (!point.IsCollected)
                 {
-                    return point;
+                    double distance = Math.Sqrt(
+                        Math.Pow(point.Position.X - position.X, 2) +
+                        Math.Pow(point.Position.Y - position.Y, 2)
+                    );
+
+                    if (distance < 8) // Радиус сбора точек
+                    {
+                        return point;
+                    }
                 }
             }
 
@@ -160,6 +199,12 @@ namespace pacman3.Models.Game
 
         public void Initialize()
         {
+            Width = 19;
+            Height = 21;
+            _grid = new int[Width, Height];
+            _points = new List<GamePoint>();
+            _walls = new List<Wall>();
+
             LoadTestLevel();
         }
 
@@ -189,35 +234,41 @@ namespace pacman3.Models.Game
                 point.Draw(drawingContext);
             }
 
-            // Рисуем сетку (для отладки)
-            DrawGrid(drawingContext);
+            // Рисуем туннели
+            DrawTunnels(drawingContext);
         }
 
-        private void DrawGrid(System.Windows.Media.DrawingContext drawingContext)
+        private void DrawTunnels(System.Windows.Media.DrawingContext drawingContext)
         {
-            var gridPen = new System.Windows.Media.Pen(
-                System.Windows.Media.Brushes.DarkGray,
-                0.5
+            // Левый туннель
+            var leftTunnel = new Rect(-TileSize, 9 * TileSize, TileSize * 2, TileSize * 3);
+            drawingContext.DrawRectangle(
+                System.Windows.Media.Brushes.Black,
+                new System.Windows.Media.Pen(System.Windows.Media.Brushes.Blue, 2),
+                leftTunnel
             );
 
-            // Вертикальные линии
-            for (int x = 0; x <= Width; x++)
-            {
-                drawingContext.DrawLine(
-                    gridPen,
-                    new System.Windows.Point(x * TileSize, 0),
-                    new System.Windows.Point(x * TileSize, Height * TileSize)
-                );
-            }
+            // Правый туннель
+            var rightTunnel = new Rect(Width * TileSize - TileSize, 9 * TileSize, TileSize * 2, TileSize * 3);
+            drawingContext.DrawRectangle(
+                System.Windows.Media.Brushes.Black,
+                new System.Windows.Media.Pen(System.Windows.Media.Brushes.Blue, 2),
+                rightTunnel
+            );
+        }
 
-            // Горизонтальные линии
-            for (int y = 0; y <= Height; y++)
+        // Проверка телепортации через туннели
+        public void CheckTeleport(GameObject obj)
+        {
+            // Телепортация через левый туннель
+            if (obj.Position.X < -obj.Size / 2)
             {
-                drawingContext.DrawLine(
-                    gridPen,
-                    new System.Windows.Point(0, y * TileSize),
-                    new System.Windows.Point(Width * TileSize, y * TileSize)
-                );
+                obj.Position = new Vector2(Width * TileSize + obj.Size / 2, obj.Position.Y);
+            }
+            // Телепортация через правый туннель
+            else if (obj.Position.X > Width * TileSize + obj.Size / 2)
+            {
+                obj.Position = new Vector2(-obj.Size / 2, obj.Position.Y);
             }
         }
     }

@@ -7,15 +7,6 @@ using pacman3.Utils;
 
 namespace pacman3.Models.Game
 {
-    public enum GameState
-    {
-        MainMenu,
-        Playing,
-        Paused,
-        GameOver,
-        Victory
-    }
-
     public class GameManager : Interfaces.IGameComponent
     {
         private GameState _currentState = GameState.MainMenu;
@@ -51,10 +42,11 @@ namespace pacman3.Models.Game
 
         public void Initialize()
         {
-            _gameField = new GameField(10, 10);
+            _gameField = new GameField(19, 21);
             _gameField.Initialize();
 
-            _playerSpawnPoint = new Vector2(5 * 32 + 16, 5 * 32 + 16);
+            // Точка спавна Pac-Man (посередине внизу)
+            _playerSpawnPoint = new Vector2(9 * 32 + 16, 15 * 32 + 16);
             _player = new Player(_playerSpawnPoint.X, _playerSpawnPoint.Y);
             _player.ScoreChanged += (s, score) => ScoreChanged?.Invoke(this, score);
             _player.LivesChanged += (s, lives) => LivesChanged?.Invoke(this, lives);
@@ -68,7 +60,7 @@ namespace pacman3.Models.Game
                 Victory?.Invoke(this, EventArgs.Empty);
             };
 
-            CurrentState = GameState.MainMenu;
+            CurrentState = GameState.Playing; // Начинаем сразу играть
         }
 
         private void InitializeGhosts()
@@ -81,11 +73,11 @@ namespace pacman3.Models.Game
                 new ClydeGhost()
             };
 
-            // Установите позиции
+            // Установите позиции привидений в центре карты
             _ghosts[0].Position = new Vector2(9 * 32 + 16, 9 * 32 + 16); // Blinky
-            _ghosts[1].Position = new Vector2(1 * 32 + 16, 1 * 32 + 16); // Pinky
-            _ghosts[2].Position = new Vector2(9 * 32 + 16, 1 * 32 + 16); // Inky
-            _ghosts[3].Position = new Vector2(1 * 32 + 16, 9 * 32 + 16); // Clyde
+            _ghosts[1].Position = new Vector2(8 * 32 + 16, 9 * 32 + 16); // Pinky
+            _ghosts[2].Position = new Vector2(10 * 32 + 16, 9 * 32 + 16); // Inky
+            _ghosts[3].Position = new Vector2(9 * 32 + 16, 8 * 32 + 16); // Clyde
         }
 
         public void Update(TimeSpan gameTime)
@@ -98,24 +90,19 @@ namespace pacman3.Models.Game
             // Проверка сбора точек игроком
             CheckPointCollection();
 
+            // Обновление игрока
+            _player.Move(_gameField);
+            _player.Update(gameTime);
+
             // Обновление привидений
             foreach (var ghost in _ghosts)
             {
                 if (ghost.IsActive)
                 {
                     ghost.TargetPosition = ghost.CalculateTargetPosition(_player.Position, _player.Direction);
-                    UpdateGhostDirection(ghost);
+                    ghost.Move(_gameField);
                     ghost.Update(gameTime);
                 }
-            }
-
-            // Обновление игрока
-            bool canMove = _gameField.CanMoveTo(_player.Position, _player.Direction, _player.Speed);
-            if (canMove)
-            {
-                bool canTurn = _gameField.CanMoveTo(_player.Position, _player.NextDirection, _player.Speed);
-                _player.ApplyNextDirection(canTurn);
-                _player.Update(gameTime);
             }
 
             // Проверка столкновений
@@ -164,6 +151,11 @@ namespace pacman3.Models.Game
                             CurrentState = GameState.GameOver;
                             GameOver?.Invoke(this, EventArgs.Empty);
                         }
+                        else
+                        {
+                            // Перезапуск уровня после потери жизни
+                            ResetLevel();
+                        }
                     }
                 }
             }
@@ -171,62 +163,13 @@ namespace pacman3.Models.Game
 
         private bool IsColliding(GameObject obj1, GameObject obj2)
         {
+            if (!obj1.IsActive || !obj2.IsActive) return false;
+
             double distance = Math.Sqrt(
                 Math.Pow(obj1.Position.X - obj2.Position.X, 2) +
                 Math.Pow(obj1.Position.Y - obj2.Position.Y, 2)
             );
             return distance < (obj1.Size / 2 + obj2.Size / 2);
-        }
-
-        private void UpdateGhostDirection(Ghost ghost)
-        {
-            if (!ghost.IsActive) return;
-
-            var possibleDirections = new List<Direction>
-            {
-                Direction.Up, Direction.Down, Direction.Left, Direction.Right
-            };
-
-            // Убираем противоположное направление
-            possibleDirections.Remove(GetOppositeDirection(ghost.Direction));
-
-            // Выбираем направление к цели
-            Vector2 difference = ghost.TargetPosition - ghost.Position;
-            Direction bestDirection = ghost.Direction;
-
-            if (Math.Abs(difference.X) > Math.Abs(difference.Y))
-            {
-                bestDirection = difference.X > 0 ? Direction.Right : Direction.Left;
-            }
-            else
-            {
-                bestDirection = difference.Y > 0 ? Direction.Down : Direction.Up;
-            }
-
-            if (possibleDirections.Contains(bestDirection) &&
-                _gameField.CanMoveTo(ghost.Position, bestDirection, ghost.Speed))
-            {
-                ghost.Direction = bestDirection;
-            }
-            else if (possibleDirections.Count > 0)
-            {
-                // Выбираем случайное доступное направление
-                var random = new Random();
-                int index = random.Next(possibleDirections.Count);
-                ghost.Direction = possibleDirections[index];
-            }
-        }
-
-        private Direction GetOppositeDirection(Direction direction)
-        {
-            switch (direction)
-            {
-                case Direction.Up: return Direction.Down;
-                case Direction.Down: return Direction.Up;
-                case Direction.Left: return Direction.Right;
-                case Direction.Right: return Direction.Left;
-                default: return Direction.None;
-            }
         }
 
         private void CheckEnergizerStatus()
@@ -239,17 +182,9 @@ namespace pacman3.Models.Game
                     if (ghost.State == GhostState.Vulnerable)
                     {
                         ghost.State = GhostState.Normal;
+                        ghost.Speed = 2.0; // Восстанавливаем скорость
                     }
                 }
-            }
-        }
-
-        private void OnPlayerDamaged(object sender, EventArgs e)
-        {
-            if (_player.Lives <= 0)
-            {
-                CurrentState = GameState.GameOver;
-                GameOver?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -305,16 +240,9 @@ namespace pacman3.Models.Game
             {
                 ghost.Respawn(ghost.Position);
                 ghost.State = GhostState.Normal;
-                ghost.IsActive = true; // Теперь это будет работать
+                ghost.IsActive = true;
+                ghost.Speed = 2.0;
             }
-        }
-
-        public void NextLevel()
-        {
-            _currentLevel++;
-            LevelChanged?.Invoke(this, _currentLevel);
-            ResetLevel();
-            // TODO: Загрузка нового уровня
         }
 
         public Player GetPlayer() => _player;

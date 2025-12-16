@@ -36,7 +36,7 @@ namespace pacman3.Models
             }
         }
 
-        public double Speed { get; set; } = 4.0;
+        public double Speed { get; set; } = 3.0;
         public Direction Direction { get; set; } = Direction.None;
 
         public Direction NextDirection
@@ -65,7 +65,7 @@ namespace pacman3.Models
 
         private void InitializePlayer()
         {
-            Size = 28;
+            Size = 24; // Уменьшили размер для лучшего прохождения
             ObjectColor = Colors.Yellow;
             Lives = 3;
             Score = 0;
@@ -76,6 +76,8 @@ namespace pacman3.Models
 
         public void HandleInput(Key key)
         {
+            if (!IsActive) return;
+
             Direction newDirection = Direction.None;
 
             switch (key)
@@ -98,7 +100,7 @@ namespace pacman3.Models
                     break;
             }
 
-            if (newDirection != Direction)
+            if (newDirection != Direction.None)
             {
                 NextDirection = newDirection;
             }
@@ -125,35 +127,58 @@ namespace pacman3.Models
             IsMoving = true;
         }
 
-        // Старый метод Move (для обратной совместимости)
-        public void Move()
+        // Основной метод движения с проверкой стены
+        public void Move(GameField gameField)
         {
-            if (Direction == Direction.None) return;
+            if (!IsActive || gameField == null) return;
 
-            Vector2 newPosition = Position;
-
-            switch (Direction)
+            // Проверяем, можем ли повернуть в желаемом направлении
+            if (NextDirection != Direction.None && NextDirection != Direction)
             {
-                case Direction.Up:
-                    newPosition.Y -= Speed;
-                    break;
-                case Direction.Down:
-                    newPosition.Y += Speed;
-                    break;
-                case Direction.Left:
-                    newPosition.X -= Speed;
-                    break;
-                case Direction.Right:
-                    newPosition.X += Speed;
-                    break;
+                if (gameField.CanMoveTo(Position, NextDirection, Speed))
+                {
+                    Direction = NextDirection;
+                    NextDirection = Direction.None;
+                }
             }
 
-            Position = newPosition;
+            // Двигаемся в текущем направлении, если это возможно
+            if (Direction != Direction.None && gameField.CanMoveTo(Position, Direction, Speed))
+            {
+                Vector2 newPosition = Position;
 
-            // Обновляем Velocity в соответствии с направлением
-            UpdateVelocityFromDirection();
+                switch (Direction)
+                {
+                    case Direction.Up:
+                        newPosition.Y -= Speed;
+                        break;
+                    case Direction.Down:
+                        newPosition.Y += Speed;
+                        break;
+                    case Direction.Left:
+                        newPosition.X -= Speed;
+                        break;
+                    case Direction.Right:
+                        newPosition.X += Speed;
+                        break;
+                }
 
-            IsMoving = true;
+                Position = newPosition;
+
+                // Обновляем Velocity в соответствии с направлением
+                UpdateVelocityFromDirection();
+
+                IsMoving = true;
+
+                // Проверяем телепортацию через туннели
+                gameField.CheckTeleport(this);
+            }
+            else
+            {
+                // Если не можем двигаться, останавливаемся
+                IsMoving = false;
+                Velocity = new Vector2(0, 0);
+            }
         }
 
         private void UpdateVelocityFromDirection()
@@ -178,16 +203,6 @@ namespace pacman3.Models
             }
         }
 
-        public void ApplyNextDirection(bool canTurn)
-        {
-            if (canTurn && NextDirection != Direction.None)
-            {
-                Direction = NextDirection;
-                NextDirection = Direction.None;
-                UpdateVelocityFromDirection();
-            }
-        }
-
         public override void Update(TimeSpan gameTime)
         {
             base.Update(gameTime);
@@ -197,16 +212,12 @@ namespace pacman3.Models
                 IsInvulnerable = false;
                 ObjectColor = Colors.Yellow;
             }
-
-            if (Direction != Direction.None)
-            {
-                Move();
-            }
         }
 
         public void AddScore(int points)
         {
             Score += points;
+            ScoreChanged?.Invoke(this, Score);
         }
 
         public void CollectPoint(int pointValue)
@@ -281,11 +292,26 @@ namespace pacman3.Models
             double mouthAngle = 45; // Угол открытия рта в градусах
             double startAngle = GetMouthStartAngle(Direction);
 
-            drawingContext.DrawGeometry(
-                brush,
-                pen,
-                CreatePacManGeometry(Position.X, Position.Y, halfSize, startAngle, mouthAngle)
-            );
+            // Если стоит на месте - рисуем полный круг
+            if (Direction == Direction.None || !IsMoving)
+            {
+                drawingContext.DrawEllipse(
+                    brush,
+                    pen,
+                    new System.Windows.Point(Position.X, Position.Y),
+                    halfSize,
+                    halfSize
+                );
+            }
+            else
+            {
+                // Рисуем Pac-Man с открытым ртом
+                drawingContext.DrawGeometry(
+                    brush,
+                    pen,
+                    CreatePacManGeometry(Position.X, Position.Y, halfSize, startAngle, mouthAngle)
+                );
+            }
         }
 
         private double GetMouthStartAngle(Direction direction)

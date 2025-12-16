@@ -9,8 +9,9 @@ namespace pacman3.Models.Ghosts
     public abstract class Ghost : GameObject, IMovable
     {
         private GhostState _state = GhostState.Normal;
+        private Random _random = new Random();
 
-        public double Speed { get; set; } = 3.0;
+        public double Speed { get; set; } = 2.0; // Уменьшили скорость привидений
         public Direction Direction { get; set; } = Direction.None;
 
         // Реализация интерфейса IMovable
@@ -42,7 +43,7 @@ namespace pacman3.Models.Ghosts
 
         private void InitializeGhost()
         {
-            Size = 30;
+            Size = 26; // Уменьшили размер
             Velocity = new Vector2(0, 0);
             UpdateColor();
         }
@@ -85,39 +86,165 @@ namespace pacman3.Models.Ghosts
             Position = newPosition;
         }
 
-        public void Move()
+        public void Move(GameField gameField)
         {
-            if (Direction == Direction.None) return;
+            if (!IsActive) return;
 
-            Vector2 newPosition = Position;
+            // Проверяем телепортацию через туннели
+            gameField.CheckTeleport(this);
 
+            // Если привидение мертво, возвращаемся домой
+            if (State == GhostState.Dead)
+            {
+                MoveToSpawn(gameField);
+                return;
+            }
+
+            // Выбираем новое направление при необходимости
+            if (_random.Next(100) < 20 || // 20% шанс сменить направление
+                Direction == Direction.None ||
+                !gameField.CanMoveTo(Position, Direction, Speed))
+            {
+                ChooseNewDirection(gameField);
+            }
+
+            if (Direction != Direction.None && gameField.CanMoveTo(Position, Direction, Speed))
+            {
+                Vector2 newPosition = Position;
+
+                switch (Direction)
+                {
+                    case Direction.Up:
+                        newPosition.Y -= Speed;
+                        break;
+                    case Direction.Down:
+                        newPosition.Y += Speed;
+                        break;
+                    case Direction.Left:
+                        newPosition.X -= Speed;
+                        break;
+                    case Direction.Right:
+                        newPosition.X += Speed;
+                        break;
+                }
+
+                Position = newPosition;
+                UpdateVelocityFromDirection();
+            }
+        }
+
+        private void MoveToSpawn(GameField gameField)
+        {
+            // Призрак возвращается в точку спавна
+            Vector2 spawnPoint = new Vector2(gameField.Width * gameField.TileSize / 2,
+                                            gameField.Height * gameField.TileSize / 2);
+
+            if (Math.Abs(Position.X - spawnPoint.X) > 1)
+            {
+                Direction = Position.X < spawnPoint.X ? Direction.Right : Direction.Left;
+            }
+            else if (Math.Abs(Position.Y - spawnPoint.Y) > 1)
+            {
+                Direction = Position.Y < spawnPoint.Y ? Direction.Down : Direction.Up;
+            }
+            else
+            {
+                // Достигли точки спавна
+                State = GhostState.Normal;
+                Direction = Direction.None;
+            }
+
+            Move(gameField);
+        }
+
+        private void ChooseNewDirection(GameField gameField)
+        {
+            var possibleDirections = new List<Direction>
+            {
+                Direction.Up, Direction.Down, Direction.Left, Direction.Right
+            };
+
+            // Убираем противоположное направление (чтобы не ходить туда-сюда)
+            possibleDirections.Remove(GetOppositeDirection(Direction));
+
+            // Фильтруем направления, в которые можно пойти
+            var validDirections = new List<Direction>();
+            foreach (var dir in possibleDirections)
+            {
+                if (gameField.CanMoveTo(Position, dir, Speed))
+                {
+                    validDirections.Add(dir);
+                }
+            }
+
+            if (validDirections.Count > 0)
+            {
+                // Выбираем направление к цели
+                if (State != GhostState.Vulnerable)
+                {
+                    // В нормальном состоянии преследуем цель
+                    Vector2 difference = TargetPosition - Position;
+                    Direction bestDirection = Direction;
+
+                    if (Math.Abs(difference.X) > Math.Abs(difference.Y))
+                    {
+                        bestDirection = difference.X > 0 ? Direction.Right : Direction.Left;
+                    }
+                    else
+                    {
+                        bestDirection = difference.Y > 0 ? Direction.Down : Direction.Up;
+                    }
+
+                    if (validDirections.Contains(bestDirection))
+                    {
+                        Direction = bestDirection;
+                        return;
+                    }
+                }
+
+                // Если не можем идти к цели или мы уязвимы - выбираем случайное
+                int index = _random.Next(validDirections.Count);
+                Direction = validDirections[index];
+            }
+        }
+
+        private Direction GetOppositeDirection(Direction direction)
+        {
+            switch (direction)
+            {
+                case Direction.Up: return Direction.Down;
+                case Direction.Down: return Direction.Up;
+                case Direction.Left: return Direction.Right;
+                case Direction.Right: return Direction.Left;
+                default: return Direction.None;
+            }
+        }
+
+        private void UpdateVelocityFromDirection()
+        {
             switch (Direction)
             {
                 case Direction.Up:
-                    newPosition.Y -= Speed;
+                    Velocity = new Vector2(0, -(float)Speed);
                     break;
                 case Direction.Down:
-                    newPosition.Y += Speed;
+                    Velocity = new Vector2(0, (float)Speed);
                     break;
                 case Direction.Left:
-                    newPosition.X -= Speed;
+                    Velocity = new Vector2(-(float)Speed, 0);
                     break;
                 case Direction.Right:
-                    newPosition.X += Speed;
+                    Velocity = new Vector2((float)Speed, 0);
+                    break;
+                case Direction.None:
+                    Velocity = new Vector2(0, 0);
                     break;
             }
-
-            Position = newPosition;
         }
 
         public override void Update(TimeSpan gameTime)
         {
             base.Update(gameTime);
-
-            if (Direction != Direction.None)
-            {
-                Move();
-            }
         }
 
         public void MakeVulnerable(TimeSpan duration)
@@ -125,6 +252,7 @@ namespace pacman3.Models.Ghosts
             if (State == GhostState.Dead) return;
 
             State = GhostState.Vulnerable;
+            Speed = 1.5; // Замедляем уязвимых привидений
 
             // Таймер возврата в нормальное состояние
             var timer = new System.Windows.Threading.DispatcherTimer();
@@ -134,6 +262,7 @@ namespace pacman3.Models.Ghosts
                 if (State == GhostState.Vulnerable)
                 {
                     State = GhostState.Normal;
+                    Speed = 2.0; // Восстанавливаем скорость
                 }
                 timer.Stop();
             };
@@ -143,6 +272,7 @@ namespace pacman3.Models.Ghosts
         public void Die()
         {
             State = GhostState.Dead;
+            Speed = 4.0; // Увеличиваем скорость для возвращения домой
         }
 
         public void Respawn(Vector2 spawnPoint)
@@ -152,6 +282,7 @@ namespace pacman3.Models.Ghosts
             Direction = Direction.None;
             Velocity = new Vector2(0, 0);
             IsActive = true;
+            Speed = 2.0;
         }
     }
 }
