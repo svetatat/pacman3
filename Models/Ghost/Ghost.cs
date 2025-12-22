@@ -13,6 +13,8 @@ namespace pacman3.Models.Ghosts
         protected Random _random = new Random();
         private System.Windows.Threading.DispatcherTimer _vulnerabilityTimer;
         private GameField _gameField;
+        private int _stuckCounter = 0;
+        private Vector2 _lastPosition;
 
         public double Speed { get; set; } = 2.0;
         public Direction Direction { get; set; } = Direction.None;
@@ -52,6 +54,7 @@ namespace pacman3.Models.Ghosts
             Size = 26;
             Velocity = new Vector2(0, 0);
             UpdateColor();
+            _lastPosition = Position;
         }
 
         private void UpdateColor()
@@ -93,6 +96,24 @@ namespace pacman3.Models.Ghosts
                 return;
             }
 
+            // Проверяем, не застрял ли призрак
+            if (Vector2.Distance(Position, _lastPosition) < 0.5)
+            {
+                _stuckCounter++;
+                if (_stuckCounter > 10)
+                {
+                    // Призрак застрял, выбираем случайное направление
+                    ForceChangeDirection();
+                    _stuckCounter = 0;
+                }
+            }
+            else
+            {
+                _stuckCounter = 0;
+            }
+
+            _lastPosition = Position;
+
             // Получаем доступные направления
             var availableDirections = GetAvailableDirections();
 
@@ -122,6 +143,27 @@ namespace pacman3.Models.Ghosts
                 }
 
                 Position = newPosition;
+            }
+        }
+
+        private void ForceChangeDirection()
+        {
+            // Принудительно меняем направление на случайное доступное
+            var directions = new List<Direction>
+            {
+                Direction.Up, Direction.Down, Direction.Left, Direction.Right
+            };
+
+            // Убираем противоположное текущему направлению
+            directions.Remove(GetOppositeDirection(Direction));
+
+            foreach (var dir in directions)
+            {
+                if (_gameField != null && _gameField.CanMoveTo(Position, dir, Speed))
+                {
+                    Direction = dir;
+                    break;
+                }
             }
         }
 
@@ -163,7 +205,23 @@ namespace pacman3.Models.Ghosts
         private Direction ChooseDirection(List<Direction> availableDirections)
         {
             if (availableDirections.Count == 0)
+            {
+                // Если нет доступных направлений, пробуем любое
+                var allDirections = new List<Direction>
+                {
+                    Direction.Up, Direction.Down, Direction.Left, Direction.Right
+                };
+                allDirections.Remove(GetOppositeDirection(Direction));
+
+                foreach (var dir in allDirections)
+                {
+                    if (_gameField != null && _gameField.CanMoveTo(Position, dir, Speed))
+                    {
+                        return dir;
+                    }
+                }
                 return Direction.None;
+            }
 
             // Если мы в уязвимом состоянии - выбираем случайное направление
             if (State == GhostState.Vulnerable)
@@ -196,10 +254,7 @@ namespace pacman3.Models.Ghosts
                             break;
                     }
 
-                    double distance = Math.Sqrt(
-                        Math.Pow(testPos.X - TargetPosition.X, 2) +
-                        Math.Pow(testPos.Y - TargetPosition.Y, 2)
-                    );
+                    double distance = Vector2.Distance(testPos, TargetPosition);
 
                     if (distance < bestDistance)
                     {

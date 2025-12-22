@@ -18,7 +18,7 @@ namespace pacman3.Models.Game
         private DateTime _energizerEndTime;
         private int _currentLevel = 1;
         private bool _isGameStarted = false;
-        private DispatcherTimer _respawnTimer;
+        private Dictionary<Ghost, DispatcherTimer> _ghostRespawnTimers;
 
         public GameState CurrentState
         {
@@ -45,9 +45,7 @@ namespace pacman3.Models.Game
 
         public GameManager()
         {
-            _respawnTimer = new DispatcherTimer();
-            _respawnTimer.Interval = TimeSpan.FromSeconds(3);
-            _respawnTimer.Tick += OnRespawnTimerTick;
+            _ghostRespawnTimers = new Dictionary<Ghost, DispatcherTimer>();
         }
 
         public void Initialize()
@@ -129,7 +127,7 @@ namespace pacman3.Models.Game
         {
             if (CurrentState != GameState.Playing || !_isGameStarted) return;
 
-            // Проверка сбора точек
+            // Проверка сбора точек - ДО движения игрока
             CheckPointCollection();
 
             // Обновление игрока
@@ -192,9 +190,22 @@ namespace pacman3.Models.Game
                     _player.AddScore(200);
                     ghost.IsActive = false;
 
-                    // Запускаем таймер возрождения
-                    _respawnTimer.Tag = ghost;
-                    _respawnTimer.Start();
+                    // Создаем таймер для возрождения этого конкретного призрака
+                    var timer = new DispatcherTimer();
+                    timer.Interval = TimeSpan.FromSeconds(5);
+                    timer.Tag = ghost;
+                    timer.Tick += (s, e) =>
+                    {
+                        if (timer.Tag is Ghost deadGhost)
+                        {
+                            RespawnGhost(deadGhost);
+                            timer.Stop();
+                            _ghostRespawnTimers.Remove(deadGhost);
+                        }
+                    };
+                    timer.Start();
+
+                    _ghostRespawnTimers[ghost] = timer;
                 }
                 else if (ghost.State == GhostState.Normal)
                 {
@@ -219,24 +230,24 @@ namespace pacman3.Models.Game
             }
         }
 
-        private void OnRespawnTimerTick(object sender, EventArgs e)
-        {
-            if (_respawnTimer.Tag is Ghost ghost)
-            {
-                RespawnGhost(ghost);
-                _respawnTimer.Stop();
-                _respawnTimer.Tag = null;
-            }
-        }
-
         private void RespawnGhost(Ghost ghost)
         {
-            var ghostHouse = _gameField.GhostHouse;
-            ghost.Position = ghostHouse;
-            ghost.State = GhostState.Normal;
-            ghost.Direction = Direction.Down;
-            ghost.IsActive = true;
-            ghost.Speed = 2.0;
+            try
+            {
+                var ghostHouse = _gameField.GhostHouse;
+                ghost.Position = ghostHouse;
+                ghost.State = GhostState.Normal;
+                ghost.Direction = Direction.Down;
+                ghost.IsActive = true;
+                ghost.Speed = 2.0;
+
+                // Останавливаем таймер уязвимости, если он был
+                ghost.MakeVulnerable(TimeSpan.Zero);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка при возрождении призрака: {ex.Message}");
+            }
         }
 
         private bool IsColliding(GameObject obj1, GameObject obj2)
@@ -247,7 +258,7 @@ namespace pacman3.Models.Game
                 Math.Pow(obj1.Position.X - obj2.Position.X, 2) +
                 Math.Pow(obj1.Position.Y - obj2.Position.Y, 2)
             );
-            return distance < (obj1.Size / 2 + obj2.Size / 2);
+            return distance < 20; // Увеличили радиус коллизии для лучшего определения
         }
 
         private void CheckEnergizerStatus()
@@ -303,6 +314,13 @@ namespace pacman3.Models.Game
 
         public void RestartGame()
         {
+            // Останавливаем все таймеры респавна
+            foreach (var timer in _ghostRespawnTimers.Values)
+            {
+                timer.Stop();
+            }
+            _ghostRespawnTimers.Clear();
+
             _currentLevel = 1;
             _gameField.ResetField();
             Initialize();
@@ -311,6 +329,13 @@ namespace pacman3.Models.Game
 
         public void GoToMainMenu()
         {
+            // Останавливаем все таймеры респавна
+            foreach (var timer in _ghostRespawnTimers.Values)
+            {
+                timer.Stop();
+            }
+            _ghostRespawnTimers.Clear();
+
             CurrentState = GameState.MainMenu;
             _isGameStarted = false;
         }
@@ -322,7 +347,7 @@ namespace pacman3.Models.Game
             var ghostHouse = _gameField.GhostHouse;
             int tileSize = _gameField.TileSize;
 
-            // Возрождаем всех привидений в доме
+            // Возрождаем всех привидений в доме (включая тех, кто был съеден)
             for (int i = 0; i < _ghosts.Count; i++)
             {
                 Vector2 position = i switch
@@ -346,7 +371,17 @@ namespace pacman3.Models.Game
                 _ghosts[i].State = GhostState.Normal;
                 _ghosts[i].IsActive = true;
                 _ghosts[i].Speed = 2.0;
+
+                // Останавливаем таймер уязвимости
+                _ghosts[i].MakeVulnerable(TimeSpan.Zero);
             }
+
+            // Очищаем таймеры респавна
+            foreach (var timer in _ghostRespawnTimers.Values)
+            {
+                timer.Stop();
+            }
+            _ghostRespawnTimers.Clear();
         }
 
         public Player GetPlayer() => _player;

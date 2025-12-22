@@ -56,7 +56,7 @@ namespace pacman3.Models.Game
                 (Height - 3) * TileSize + TileSize / 2
             );
 
-            // Дом призраков в центре (БОЛЬШЕ!)
+            // Дом призраков в центре
             GhostHouse = new Vector2(
                 Width / 2 * TileSize + TileSize / 2,
                 8 * TileSize + TileSize / 2
@@ -73,7 +73,7 @@ namespace pacman3.Models.Game
             // 2. Простой лабиринт внутри
             CreateSimpleMaze();
 
-            // 3. Дом призраков (БОЛЬШОЙ с выходами!)
+            // 3. Дом призраков
             CreateBigGhostHouse();
 
             // 4. Точки везде, где можно пройти
@@ -140,9 +140,9 @@ namespace pacman3.Models.Game
         private void CreateBigGhostHouse()
         {
             int centerX = Width / 2;
-            int houseY = 6; // Выше для большего пространства
-            int houseWidth = 7; // Ширина дома - 7 тайлов
-            int houseHeight = 5; // Высота дома - 5 тайлов
+            int houseY = 6;
+            int houseWidth = 7;
+            int houseHeight = 5;
 
             // Очищаем область дома от стен
             for (int x = centerX - houseWidth / 2; x <= centerX + houseWidth / 2; x++)
@@ -159,10 +159,9 @@ namespace pacman3.Models.Game
                 AddWall(x, houseY - houseHeight / 2);
             }
 
-            // Нижняя стена дома (с БОЛЬШИМ выходом!)
+            // Нижняя стена дома
             for (int x = centerX - houseWidth / 2; x <= centerX + houseWidth / 2; x++)
             {
-                // Оставляем большой проход в центре (3 тайла)
                 if (x < centerX - 1 || x > centerX + 1)
                     AddWall(x, houseY + houseHeight / 2);
             }
@@ -183,31 +182,32 @@ namespace pacman3.Models.Game
             RemoveWall(centerX - 1, houseY + houseHeight / 2 + 1);
             RemoveWall(centerX, houseY + houseHeight / 2 + 1);
             RemoveWall(centerX + 1, houseY + houseHeight / 2 + 1);
-            RemoveWall(centerX - 1, houseY + houseHeight / 2 + 2);
-            RemoveWall(centerX, houseY + houseHeight / 2 + 2);
-            RemoveWall(centerX + 1, houseY + houseHeight / 2 + 2);
         }
 
         private void CreateDots()
         {
             // Проходим по всей карте
-            for (int x = 1; x < Width - 1; x++)
+            for (int x = 0; x < Width; x++)
             {
-                for (int y = 1; y < Height - 1; y++)
+                for (int y = 0; y < Height; y++)
                 {
                     // Пропускаем стены
                     if (IsWallAtGrid(x, y))
                         continue;
 
-                    // Пропускаем дом призраков
-                    if (IsInGhostHouse(x, y))
+                    // Пропускаем дом призраков (внутренняя область)
+                    if (IsInGhostHouseInner(x, y))
                         continue;
 
                     // Пропускаем места для энерджайзеров
                     if (IsEnergizerSpot(x, y))
                         continue;
 
-                    // Добавляем точку
+                    // Пропускаем спавн игрока и призраков
+                    if (IsSpawnPoint(x, y))
+                        continue;
+
+                    // Добавляем точку ТОЧНО в центре тайла
                     AddPoint(x, y);
                 }
             }
@@ -242,6 +242,7 @@ namespace pacman3.Models.Game
 
         private void AddPoint(int gridX, int gridY)
         {
+            // Точка ТОЧНО в центре тайла
             double posX = gridX * TileSize + TileSize / 2;
             double posY = gridY * TileSize + TileSize / 2;
 
@@ -252,6 +253,7 @@ namespace pacman3.Models.Game
 
         private void AddEnergizer(int gridX, int gridY)
         {
+            // Энерджайзер ТОЧНО в центре тайла
             double posX = gridX * TileSize + TileSize / 2;
             double posY = gridY * TileSize + TileSize / 2;
 
@@ -275,15 +277,15 @@ namespace pacman3.Models.Game
             return false;
         }
 
-        private bool IsInGhostHouse(int gridX, int gridY)
+        private bool IsInGhostHouseInner(int gridX, int gridY)
         {
             int centerX = Width / 2;
             int houseY = 6;
             int houseWidth = 7;
             int houseHeight = 5;
 
-            return gridX >= centerX - houseWidth / 2 && gridX <= centerX + houseWidth / 2 &&
-                   gridY >= houseY - houseHeight / 2 && gridY <= houseY + houseHeight / 2;
+            return gridX > centerX - houseWidth / 2 && gridX < centerX + houseWidth / 2 &&
+                   gridY > houseY - houseHeight / 2 && gridY < houseY + houseHeight / 2;
         }
 
         private bool IsEnergizerSpot(int gridX, int gridY)
@@ -292,6 +294,22 @@ namespace pacman3.Models.Game
                    (gridX == Width - 3 && gridY == 2) ||
                    (gridX == 2 && gridY == Height - 3) ||
                    (gridX == Width - 3 && gridY == Height - 3);
+        }
+
+        private bool IsSpawnPoint(int gridX, int gridY)
+        {
+            // Спавн игрока
+            if (gridX == Width / 2 && gridY == Height - 3)
+                return true;
+
+            // Спавн призраков (дом)
+            int centerX = Width / 2;
+            int houseY = 6;
+
+            return (gridX == centerX && gridY == houseY - 1) || // Верх
+                   (gridX == centerX - 1 && gridY == houseY) || // Лево
+                   (gridX == centerX && gridY == houseY + 1) || // Низ
+                   (gridX == centerX + 1 && gridY == houseY);   // Право
         }
 
         private void OnPointCollected(object sender, EventArgs e)
@@ -370,17 +388,17 @@ namespace pacman3.Models.Game
 
         public GamePoint GetPointAt(Vector2 position)
         {
-            double tolerance = 12;
+            double tolerance = 8; // Уменьшили для большей точности
 
             // Проверяем обычные точки
             foreach (var point in _points)
             {
                 if (!point.IsCollected && point.IsActive)
                 {
-                    double distance = Math.Sqrt(
-                        Math.Pow(point.Position.X - position.X, 2) +
-                        Math.Pow(point.Position.Y - position.Y, 2)
-                    );
+                    // Более точная проверка расстояния
+                    double dx = point.Position.X - position.X;
+                    double dy = point.Position.Y - position.Y;
+                    double distance = Math.Sqrt(dx * dx + dy * dy);
 
                     if (distance < tolerance)
                     {
@@ -394,10 +412,9 @@ namespace pacman3.Models.Game
             {
                 if (!energizer.IsCollected && energizer.IsActive)
                 {
-                    double distance = Math.Sqrt(
-                        Math.Pow(energizer.Position.X - position.X, 2) +
-                        Math.Pow(energizer.Position.Y - position.Y, 2)
-                    );
+                    double dx = energizer.Position.X - position.X;
+                    double dy = energizer.Position.Y - position.Y;
+                    double distance = Math.Sqrt(dx * dx + dy * dy);
 
                     if (distance < tolerance)
                     {
@@ -481,9 +498,6 @@ namespace pacman3.Models.Game
 
             // Рисуем туннели
             DrawTunnels(drawingContext);
-
-            // Рисуем дом призраков (визуально)
-            DrawGhostHouse(drawingContext);
         }
 
         private void DrawTunnels(System.Windows.Media.DrawingContext drawingContext)
@@ -504,28 +518,6 @@ namespace pacman3.Models.Game
                 System.Windows.Media.Brushes.Black,
                 new System.Windows.Media.Pen(System.Windows.Media.Brushes.Blue, 2),
                 rightTunnel
-            );
-        }
-
-        private void DrawGhostHouse(System.Windows.Media.DrawingContext drawingContext)
-        {
-            int centerX = Width / 2;
-            int houseY = 6;
-            int houseWidth = 7;
-            int houseHeight = 5;
-
-            // Рисуем границы дома призраков (красные линии)
-            var houseRect = new Rect(
-                (centerX - houseWidth / 2) * TileSize + 4,
-                (houseY - houseHeight / 2) * TileSize + 4,
-                houseWidth * TileSize - 8,
-                houseHeight * TileSize - 8
-            );
-
-            drawingContext.DrawRectangle(
-                System.Windows.Media.Brushes.Transparent,
-                new System.Windows.Media.Pen(System.Windows.Media.Brushes.Red, 2),
-                houseRect
             );
         }
 

@@ -110,13 +110,15 @@ namespace pacman3.Models
         {
             if (!IsActive || gameField == null) return;
 
-            // Проверяем, можем ли повернуть
+            // Сначала проверяем возможность поворота
             if (NextDirection != Direction.None && NextDirection != Direction)
             {
-                if (gameField.CanMoveTo(Position, NextDirection, Speed))
+                if (CanTurn(NextDirection, gameField))
                 {
                     Direction = NextDirection;
                     NextDirection = Direction.None;
+                    // После поворота корректируем позицию для движения по центру
+                    SnapToGridCenter(gameField);
                 }
             }
 
@@ -151,6 +153,41 @@ namespace pacman3.Models
             {
                 IsMoving = false;
             }
+        }
+
+        private bool CanTurn(Direction turnDirection, GameField gameField)
+        {
+            // Проверяем, можем ли повернуть на ближайшем перекрестке
+            // Для этого проверяем, находимся ли мы примерно по центру тайла
+
+            double tileSize = gameField.TileSize;
+            double centerX = Math.Round(Position.X / tileSize) * tileSize + tileSize / 2;
+            double centerY = Math.Round(Position.Y / tileSize) * tileSize + tileSize / 2;
+
+            // Если мы достаточно близко к центру тайла, можно повернуть
+            double distanceToCenter = Math.Sqrt(
+                Math.Pow(Position.X - centerX, 2) +
+                Math.Pow(Position.Y - centerY, 2)
+            );
+
+            return distanceToCenter < 8 && gameField.CanMoveTo(Position, turnDirection, Speed);
+        }
+
+        private void SnapToGridCenter(GameField gameField)
+        {
+            // Привязываемся к центру тайла для более точного движения
+            double tileSize = gameField.TileSize;
+
+            // Находим ближайший центр тайла
+            double nearestCenterX = Math.Round(Position.X / tileSize) * tileSize + tileSize / 2;
+            double nearestCenterY = Math.Round(Position.Y / tileSize) * tileSize + tileSize / 2;
+
+            // Если мы достаточно близко, привязываемся
+            if (Math.Abs(Position.X - nearestCenterX) < 4)
+                Position = new Vector2(nearestCenterX, Position.Y);
+
+            if (Math.Abs(Position.Y - nearestCenterY) < 4)
+                Position = new Vector2(Position.X, nearestCenterY);
         }
 
         public override void Update(TimeSpan gameTime)
@@ -209,7 +246,7 @@ namespace pacman3.Models
         {
             Position = spawnPoint;
             IsActive = true;
-            Direction = Direction.Right; // Важно: явно устанавливаем направление
+            Direction = Direction.Right;
             NextDirection = Direction.None;
             Velocity = new Vector2(0, 0);
             IsMoving = false;
@@ -220,7 +257,7 @@ namespace pacman3.Models
         {
             Lives = 3;
             Score = 0;
-            Direction = Direction.Right; // Явно устанавливаем направление
+            Direction = Direction.Right;
             NextDirection = Direction.None;
             Velocity = new Vector2(0, 0);
             IsMoving = false;
@@ -238,7 +275,7 @@ namespace pacman3.Models
 
             double halfSize = Size / 2;
 
-            // Просто рисуем круг - это нормально для Pac-Man
+            // Рисуем простой круг (как было изначально)
             drawingContext.DrawEllipse(
                 brush,
                 pen,
