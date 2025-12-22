@@ -103,6 +103,14 @@ namespace pacman3.Models
             if (newDirection != Direction.None)
             {
                 NextDirection = newDirection;
+
+                // Если стоим на месте, сразу поворачиваем
+                if (!IsMoving)
+                {
+                    Direction = NextDirection;
+                    NextDirection = Direction.None;
+                    IsMoving = true;
+                }
             }
         }
 
@@ -110,15 +118,19 @@ namespace pacman3.Models
         {
             if (!IsActive || gameField == null) return;
 
-            // Сначала проверяем возможность поворота
+            // Проверяем, находимся ли мы достаточно близко к центру тайла для поворота
             if (NextDirection != Direction.None && NextDirection != Direction)
             {
-                if (CanTurn(NextDirection, gameField))
+                if (IsAtGridCenter(gameField))
                 {
-                    Direction = NextDirection;
-                    NextDirection = Direction.None;
-                    // После поворота корректируем позицию для движения по центру
-                    SnapToGridCenter(gameField);
+                    // Можно повернуть, только если находимся в центре тайла
+                    if (gameField.CanMoveTo(Position, NextDirection, Speed))
+                    {
+                        Direction = NextDirection;
+                        NextDirection = Direction.None;
+                        SnapToGridCenter(gameField);
+                        IsMoving = true;
+                    }
                 }
             }
 
@@ -143,6 +155,12 @@ namespace pacman3.Models
                         break;
                 }
 
+                // Принудительно привязываем к сетке для точного движения
+                if (ShouldSnapToGrid(gameField, newPosition))
+                {
+                    SnapToGridCenter(gameField);
+                }
+
                 Position = newPosition;
                 IsMoving = true;
 
@@ -151,43 +169,60 @@ namespace pacman3.Models
             }
             else
             {
+                // Не можем двигаться в текущем направлении
                 IsMoving = false;
+
+                // Пытаемся повернуть, если есть желаемое направление
+                if (NextDirection != Direction.None && NextDirection != Direction)
+                {
+                    if (gameField.CanMoveTo(Position, NextDirection, Speed))
+                    {
+                        Direction = NextDirection;
+                        NextDirection = Direction.None;
+                        IsMoving = true;
+                    }
+                }
             }
         }
 
-        private bool CanTurn(Direction turnDirection, GameField gameField)
+        private bool IsAtGridCenter(GameField gameField)
         {
-            // Проверяем, можем ли повернуть на ближайшем перекрестке
-            // Для этого проверяем, находимся ли мы примерно по центру тайла
-
             double tileSize = gameField.TileSize;
-            double centerX = Math.Round(Position.X / tileSize) * tileSize + tileSize / 2;
-            double centerY = Math.Round(Position.Y / tileSize) * tileSize + tileSize / 2;
+            double gridX = Math.Round((Position.X - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
+            double gridY = Math.Round((Position.Y - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
 
-            // Если мы достаточно близко к центру тайла, можно повернуть
-            double distanceToCenter = Math.Sqrt(
-                Math.Pow(Position.X - centerX, 2) +
-                Math.Pow(Position.Y - centerY, 2)
+            double distance = Math.Sqrt(
+                Math.Pow(Position.X - gridX, 2) +
+                Math.Pow(Position.Y - gridY, 2)
             );
 
-            return distanceToCenter < 8 && gameField.CanMoveTo(Position, turnDirection, Speed);
+            return distance < 2; // Очень близко к центру
+        }
+
+        private bool ShouldSnapToGrid(GameField gameField, Vector2 newPosition)
+        {
+            double tileSize = gameField.TileSize;
+
+            // Проверяем, проходим ли мы через центр тайла
+            double currentGridX = Math.Round((Position.X - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
+            double currentGridY = Math.Round((Position.Y - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
+
+            double newGridX = Math.Round((newPosition.X - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
+            double newGridY = Math.Round((newPosition.Y - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
+
+            // Если мы пересекли границу между тайлами, нужно привязаться
+            return Math.Abs(currentGridX - newGridX) > 0.1 || Math.Abs(currentGridY - newGridY) > 0.1;
         }
 
         private void SnapToGridCenter(GameField gameField)
         {
-            // Привязываемся к центру тайла для более точного движения
+            // Привязываемся точно к центру тайла
             double tileSize = gameField.TileSize;
 
-            // Находим ближайший центр тайла
-            double nearestCenterX = Math.Round(Position.X / tileSize) * tileSize + tileSize / 2;
-            double nearestCenterY = Math.Round(Position.Y / tileSize) * tileSize + tileSize / 2;
+            double gridX = Math.Round((Position.X - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
+            double gridY = Math.Round((Position.Y - tileSize / 2) / tileSize) * tileSize + tileSize / 2;
 
-            // Если мы достаточно близко, привязываемся
-            if (Math.Abs(Position.X - nearestCenterX) < 4)
-                Position = new Vector2(nearestCenterX, Position.Y);
-
-            if (Math.Abs(Position.Y - nearestCenterY) < 4)
-                Position = new Vector2(Position.X, nearestCenterY);
+            Position = new Vector2(gridX, gridY);
         }
 
         public override void Update(TimeSpan gameTime)
