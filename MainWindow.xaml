@@ -49,12 +49,6 @@
                        Margin="5"
                        FontSize="14"
                        Click="PauseButton_Click"/>
-                <Button x:Name="RestartButton" 
-                       Content="Рестарт" 
-                       Padding="15,5" 
-                       Margin="5"
-                       FontSize="14"
-                       Click="RestartButton_Click"/>
                 <Button x:Name="MenuButton" 
                        Content="Главное меню" 
                        Padding="15,5" 

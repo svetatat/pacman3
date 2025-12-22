@@ -59,23 +59,20 @@ namespace pacman3
                     case GameState.MainMenu:
                         StartButton.Content = "Начать игру";
                         PauseButton.IsEnabled = false;
-                        RestartButton.IsEnabled = false;
                         MenuButton.IsEnabled = false;
                         break;
 
                     case GameState.Playing:
-                        StartButton.Content = "Продолжить";
+                        StartButton.Content = "Новая игра";
                         PauseButton.Content = "Пауза";
                         PauseButton.IsEnabled = true;
-                        RestartButton.IsEnabled = true;
                         MenuButton.IsEnabled = true;
                         break;
 
                     case GameState.Paused:
-                        StartButton.Content = "Продолжить";
+                        StartButton.Content = "Новая игра";
                         PauseButton.Content = "Продолжить";
                         PauseButton.IsEnabled = true;
-                        RestartButton.IsEnabled = true;
                         MenuButton.IsEnabled = true;
                         break;
 
@@ -83,7 +80,6 @@ namespace pacman3
                     case GameState.Victory:
                         StartButton.Content = "Новая игра";
                         PauseButton.IsEnabled = false;
-                        RestartButton.IsEnabled = true;
                         MenuButton.IsEnabled = true;
                         break;
                 }
@@ -93,16 +89,8 @@ namespace pacman3
         // Обработчики кнопок
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_gameManager.CurrentState == GameState.MainMenu ||
-                _gameManager.CurrentState == GameState.GameOver ||
-                _gameManager.CurrentState == GameState.Victory)
-            {
-                _gameManager.StartGame();
-            }
-            else if (_gameManager.CurrentState == GameState.Paused)
-            {
-                _gameManager.ResumeGame();
-            }
+            // Всегда начинает новую игру (работает как рестарт)
+            _gameManager.StartGame();
             UpdateButtonStates();
         }
 
@@ -118,12 +106,6 @@ namespace pacman3
                 _gameManager.ResumeGame();
                 PauseButton.Content = "Пауза";
             }
-            UpdateButtonStates();
-        }
-
-        private void RestartButton_Click(object sender, RoutedEventArgs e)
-        {
-            _gameManager.RestartGame();
             UpdateButtonStates();
         }
 
@@ -323,7 +305,7 @@ namespace pacman3
             ));
 
             var restartText = new FormattedText(
-                "Нажмите 'Новая игра' или Ctrl+R",
+                "Нажмите 'Новая игра' для начала",
                 System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface("Arial"),
@@ -376,7 +358,7 @@ namespace pacman3
             ));
 
             var restartText = new FormattedText(
-                "Нажмите 'Новая игра' или Ctrl+R",
+                "Нажмите 'Новая игра'",
                 System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface("Arial"),
@@ -459,14 +441,6 @@ namespace pacman3
                         _gameManager.StartGame();
                     }
                     UpdateButtonStates();
-                    break;
-
-                case Key.R:
-                    if (Keyboard.Modifiers == ModifierKeys.Control)
-                    {
-                        _gameManager.RestartGame();
-                        UpdateButtonStates();
-                    }
                     break;
 
                 case Key.Enter:
