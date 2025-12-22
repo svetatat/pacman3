@@ -20,6 +20,7 @@ namespace pacman3
         {
             InitializeComponent();
             InitializeGame();
+            UpdateButtonStates();
         }
 
         private void InitializeGame()
@@ -49,78 +50,160 @@ namespace pacman3
             Focus();
         }
 
+        private void UpdateButtonStates()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                switch (_gameManager.CurrentState)
+                {
+                    case GameState.MainMenu:
+                        StartButton.Content = "Начать игру";
+                        PauseButton.IsEnabled = false;
+                        RestartButton.IsEnabled = false;
+                        MenuButton.IsEnabled = false;
+                        break;
+
+                    case GameState.Playing:
+                        StartButton.Content = "Продолжить";
+                        PauseButton.Content = "Пауза";
+                        PauseButton.IsEnabled = true;
+                        RestartButton.IsEnabled = true;
+                        MenuButton.IsEnabled = true;
+                        break;
+
+                    case GameState.Paused:
+                        StartButton.Content = "Продолжить";
+                        PauseButton.Content = "Продолжить";
+                        PauseButton.IsEnabled = true;
+                        RestartButton.IsEnabled = true;
+                        MenuButton.IsEnabled = true;
+                        break;
+
+                    case GameState.GameOver:
+                    case GameState.Victory:
+                        StartButton.Content = "Новая игра";
+                        PauseButton.IsEnabled = false;
+                        RestartButton.IsEnabled = true;
+                        MenuButton.IsEnabled = true;
+                        break;
+                }
+            });
+        }
+
+        // Обработчики кнопок
+        private void StartButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_gameManager.CurrentState == GameState.MainMenu ||
+                _gameManager.CurrentState == GameState.GameOver ||
+                _gameManager.CurrentState == GameState.Victory)
+            {
+                _gameManager.StartGame();
+            }
+            else if (_gameManager.CurrentState == GameState.Paused)
+            {
+                _gameManager.ResumeGame();
+            }
+            UpdateButtonStates();
+        }
+
+        private void PauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_gameManager.CurrentState == GameState.Playing)
+            {
+                _gameManager.PauseGame();
+                PauseButton.Content = "Продолжить";
+            }
+            else if (_gameManager.CurrentState == GameState.Paused)
+            {
+                _gameManager.ResumeGame();
+                PauseButton.Content = "Пауза";
+            }
+            UpdateButtonStates();
+        }
+
+        private void RestartButton_Click(object sender, RoutedEventArgs e)
+        {
+            _gameManager.RestartGame();
+            UpdateButtonStates();
+        }
+
+        private void MenuButton_Click(object sender, RoutedEventArgs e)
+        {
+            _gameManager.GoToMainMenu();
+            UpdateButtonStates();
+        }
+
         private void GameLoop(object sender, EventArgs e)
         {
-            // Обновление игры
-            _gameManager.Update(_gameTimer.Interval);
+            // Обновление игры только если игра активна
+            if (_gameManager.CurrentState == GameState.Playing)
+            {
+                _gameManager.Update(_gameTimer.Interval);
+            }
 
-            // Отрисовка
+            // Отрисовка всегда
             DrawGame();
         }
 
         private void DrawGame()
         {
-            GameCanvas.Children.Clear();
-
-            var drawingVisual = new DrawingVisual();
-            using (var drawingContext = drawingVisual.RenderOpen())
+            Dispatcher.Invoke(() =>
             {
-                // Рисуем в зависимости от состояния игры
-                if (_gameManager.CurrentState == GameState.MainMenu)
+                GameCanvas.Children.Clear();
+
+                var drawingVisual = new DrawingVisual();
+                using (var drawingContext = drawingVisual.RenderOpen())
                 {
-                    _mainMenu.Draw(drawingContext);
+                    // Рисуем в зависимости от состояния игры
+                    if (_gameManager.CurrentState == GameState.MainMenu)
+                    {
+                        _mainMenu.Draw(drawingContext);
+                    }
+                    else if (_gameManager.CurrentState == GameState.Playing ||
+                             _gameManager.CurrentState == GameState.Paused ||
+                             _gameManager.CurrentState == GameState.GameOver ||
+                             _gameManager.CurrentState == GameState.Victory)
+                    {
+                        // Рисуем игровое поле (стены и точки)
+                        var gameField = _gameManager.GetGameField();
+                        if (gameField != null)
+                        {
+                            gameField.Draw(drawingContext);
+                        }
+
+                        // Рисуем приведений
+                        foreach (var ghost in _gameManager.GetGhosts())
+                        {
+                            ghost.Draw(drawingContext);
+                        }
+
+                        // Рисуем игрока
+                        _player.Draw(drawingContext);
+
+                        // Рисуем UI поверх игры
+                        DrawUI(drawingContext);
+
+                        // Рисуем сообщения в зависимости от состояния
+                        if (_gameManager.CurrentState == GameState.Paused)
+                        {
+                            DrawPauseScreen(drawingContext);
+                        }
+                        else if (_gameManager.CurrentState == GameState.GameOver)
+                        {
+                            DrawGameOverScreen(drawingContext);
+                        }
+                        else if (_gameManager.CurrentState == GameState.Victory)
+                        {
+                            DrawVictoryScreen(drawingContext);
+                        }
+                    }
                 }
-                else if (_gameManager.CurrentState == GameState.Playing ||
-                         _gameManager.CurrentState == GameState.Paused ||
-                         _gameManager.CurrentState == GameState.GameOver ||
-                         _gameManager.CurrentState == GameState.Victory)
-                {
-                    // Рисуем игровое поле (стены и точки)
-                    var gameField = _gameManager.GetGameField();
-                    if (gameField != null)
-                    {
-                        gameField.Draw(drawingContext);
-                    }
 
-                    // Рисуем приведений
-                    foreach (var ghost in _gameManager.GetGhosts())
-                    {
-                        ghost.Draw(drawingContext);
-                    }
+                GameCanvas.Children.Add(new DrawingVisualHost(drawingVisual));
 
-                    // Рисуем игрока
-                    _player.Draw(drawingContext);
-
-                    // Рисуем UI поверх игры
-                    DrawUI(drawingContext);
-
-                    // Рисуем сообщения в зависимости от состояния
-                    if (_gameManager.CurrentState == GameState.Paused)
-                    {
-                        DrawPauseScreen(drawingContext);
-                    }
-                    else if (_gameManager.CurrentState == GameState.GameOver)
-                    {
-                        DrawGameOverScreen(drawingContext);
-                    }
-                    else if (_gameManager.CurrentState == GameState.Victory)
-                    {
-                        DrawVictoryScreen(drawingContext);
-                    }
-                }
-            }
-
-            GameCanvas.Children.Add(new DrawingVisualHost(drawingVisual));
-
-            // Обновляем UI информацию
-            UpdateGameInfo();
-
-            // Отладочная информация
-            var gameFieldInfo = _gameManager.GetGameField();
-            if (gameFieldInfo != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"Точек на поле: {gameFieldInfo.Points.Count}, собрано: {gameFieldInfo.Points.Count(p => p.IsCollected)}");
-            }
+                // Обновляем UI информацию
+                UpdateGameInfo();
+            });
         }
 
         private void DrawUI(DrawingContext drawingContext)
@@ -187,7 +270,7 @@ namespace pacman3
             ));
 
             var instructionText = new FormattedText(
-                "Нажмите ESC для продолжения",
+                "Нажмите ESC или кнопку 'Продолжить'",
                 System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface("Arial"),
@@ -240,7 +323,7 @@ namespace pacman3
             ));
 
             var restartText = new FormattedText(
-                "Нажмите Ctrl+R для перезапуска",
+                "Нажмите 'Новая игра' или Ctrl+R",
                 System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface("Arial"),
@@ -293,7 +376,7 @@ namespace pacman3
             ));
 
             var restartText = new FormattedText(
-                "Нажмите Ctrl+R для новой игры",
+                "Нажмите 'Новая игра' или Ctrl+R",
                 System.Globalization.CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight,
                 new Typeface("Arial"),
@@ -322,11 +405,15 @@ namespace pacman3
 
         private void UpdateGameInfo()
         {
-            StatusText.Text = $"Жизни: {_player.Lives} | Очки: {_player.Score} | Состояние: {GetStateText(_gameManager.CurrentState)}";
+            Dispatcher.Invoke(() =>
+            {
+                StatusText.Text = $"Жизни: {_player.Lives} | Очки: {_player.Score} | Состояние: {GetStateText(_gameManager.CurrentState)}";
+            });
         }
 
         private void OnGameStateChanged(object sender, GameState state)
         {
+            UpdateButtonStates();
             UpdateGameInfo();
         }
 
@@ -342,12 +429,83 @@ namespace pacman3
 
         private void OnGameOver(object sender, EventArgs e)
         {
-            // Автоматический переход в состояние GameOver
+            UpdateButtonStates();
         }
 
         private void OnVictory(object sender, EventArgs e)
         {
-            // Автоматический переход в состояние Victory
+            UpdateButtonStates();
+        }
+
+        // Обработка клавиатуры
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            switch (e.Key)
+            {
+                case Key.Escape:
+                    if (_gameManager.CurrentState == GameState.Playing)
+                    {
+                        _gameManager.PauseGame();
+                        PauseButton.Content = "Продолжить";
+                    }
+                    else if (_gameManager.CurrentState == GameState.Paused)
+                    {
+                        _gameManager.ResumeGame();
+                        PauseButton.Content = "Пауза";
+                    }
+                    else if (_gameManager.CurrentState == GameState.MainMenu)
+                    {
+                        // Выход из главного меню - начинаем игру
+                        _gameManager.StartGame();
+                    }
+                    UpdateButtonStates();
+                    break;
+
+                case Key.R:
+                    if (Keyboard.Modifiers == ModifierKeys.Control)
+                    {
+                        _gameManager.RestartGame();
+                        UpdateButtonStates();
+                    }
+                    break;
+
+                case Key.Enter:
+                    if (_gameManager.CurrentState == GameState.MainMenu)
+                    {
+                        _gameManager.StartGame();
+                        UpdateButtonStates();
+                    }
+                    break;
+
+                case Key.Space:
+                    if (_gameManager.CurrentState == GameState.Playing)
+                    {
+                        _gameManager.PauseGame();
+                        PauseButton.Content = "Продолжить";
+                    }
+                    else if (_gameManager.CurrentState == GameState.Paused)
+                    {
+                        _gameManager.ResumeGame();
+                        PauseButton.Content = "Пауза";
+                    }
+                    UpdateButtonStates();
+                    break;
+
+                // Управление Pac-Man
+                case Key.Up:
+                case Key.W:
+                case Key.Down:
+                case Key.S:
+                case Key.Left:
+                case Key.A:
+                case Key.Right:
+                case Key.D:
+                    if (_gameManager.CurrentState == GameState.Playing && _player != null)
+                    {
+                        _player.HandleInput(e.Key);
+                    }
+                    break;
+            }
         }
 
         // Вспомогательный класс для отрисовки
@@ -358,94 +516,6 @@ namespace pacman3
             public DrawingVisualHost(DrawingVisual visual) => _visual = visual;
             protected override Visual GetVisualChild(int index) => _visual;
             protected override int VisualChildrenCount => 1;
-        }
-
-        // Обработка ввода с клавиатуры
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
-
-            switch (e.Key)
-            {
-                case Key.Escape:
-                    // Пауза/продолжение
-                    if (_gameManager.CurrentState == GameState.Playing)
-                    {
-                        _gameManager.PauseGame();
-                    }
-                    else if (_gameManager.CurrentState == GameState.Paused)
-                    {
-                        _gameManager.ResumeGame();
-                    }
-                    else if (_gameManager.CurrentState == GameState.MainMenu)
-                    {
-                        // Выход из главного меню
-                        _gameManager.CurrentState = GameState.Playing;
-                    }
-                    break;
-
-                case Key.R:
-                    // Перезапуск игры
-                    if (Keyboard.Modifiers == ModifierKeys.Control)
-                    {
-                        _gameManager.RestartGame();
-                        UpdateGameInfo();
-                    }
-                    break;
-
-                // Управление Pac-Man
-                case Key.Up:
-                case Key.W:
-                    if (_gameManager.CurrentState == GameState.Playing)
-                    {
-                        _player.HandleInput(e.Key);
-                    }
-                    break;
-
-                case Key.Down:
-                case Key.S:
-                    if (_gameManager.CurrentState == GameState.Playing)
-                    {
-                        _player.HandleInput(e.Key);
-                    }
-                    break;
-
-                case Key.Left:
-                case Key.A:
-                    if (_gameManager.CurrentState == GameState.Playing)
-                    {
-                        _player.HandleInput(e.Key);
-                    }
-                    break;
-
-                case Key.Right:
-                case Key.D:
-                    if (_gameManager.CurrentState == GameState.Playing)
-                    {
-                        _player.HandleInput(e.Key);
-                    }
-                    break;
-
-                case Key.Enter:
-                    // Старт игры с главного меню
-                    if (_gameManager.CurrentState == GameState.MainMenu)
-                    {
-                        _gameManager.CurrentState = GameState.Playing;
-                    }
-                    break;
-
-                case Key.Space:
-                    // Альтернативная пауза
-                    if (_gameManager.CurrentState == GameState.Playing)
-                    {
-                        _gameManager.PauseGame();
-                    }
-                    else if (_gameManager.CurrentState == GameState.Paused)
-                    {
-                        _gameManager.ResumeGame();
-                    }
-                    break;
-            }
         }
 
         protected override void OnClosed(EventArgs e)

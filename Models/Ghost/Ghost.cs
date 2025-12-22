@@ -12,6 +12,7 @@ namespace pacman3.Models.Ghosts
         private GhostState _state = GhostState.Normal;
         protected Random _random = new Random();
         private System.Windows.Threading.DispatcherTimer _vulnerabilityTimer;
+        private GameField _gameField;
 
         public double Speed { get; set; } = 2.0;
         public Direction Direction { get; set; } = Direction.None;
@@ -78,7 +79,9 @@ namespace pacman3.Models.Ghosts
 
         public void Move(GameField gameField)
         {
-            if (!IsActive) return;
+            if (!IsActive || gameField == null) return;
+
+            _gameField = gameField;
 
             // Проверяем телепортацию
             gameField.CheckTeleport(this);
@@ -86,29 +89,20 @@ namespace pacman3.Models.Ghosts
             // Если призрак мертв - возвращаемся в дом
             if (State == GhostState.Dead)
             {
-                MoveToGhostHouse(gameField);
+                MoveToGhostHouse();
                 return;
             }
 
             // Получаем доступные направления
-            var availableDirections = gameField.GetAvailableDirections(Position, Direction);
-            
-            // Если нет доступных направлений, выбираем любое
-            if (availableDirections.Count == 0)
-            {
-                availableDirections = new List<Direction> 
-                { 
-                    Direction.Up, Direction.Down, Direction.Left, Direction.Right 
-                };
-            }
+            var availableDirections = GetAvailableDirections();
 
             // Выбираем направление
-            Direction chosenDirection = ChooseDirection(availableDirections, gameField);
-            
+            Direction chosenDirection = ChooseDirection(availableDirections);
+
             if (chosenDirection != Direction.None && gameField.CanMoveTo(Position, chosenDirection, Speed))
             {
                 Direction = chosenDirection;
-                
+
                 // Двигаемся
                 Vector2 newPosition = Position;
                 switch (Direction)
@@ -126,75 +120,116 @@ namespace pacman3.Models.Ghosts
                         newPosition.X += Speed;
                         break;
                 }
-                
+
                 Position = newPosition;
             }
         }
 
-        private Direction ChooseDirection(List<Direction> availableDirections, GameField gameField)
+        private List<Direction> GetAvailableDirections()
         {
-            // Фильтруем направления, в которые можно пойти
-            var validDirections = new List<Direction>();
-            foreach (var dir in availableDirections)
+            var directions = new List<Direction>();
+
+            if (_gameField != null)
             {
-                if (gameField.CanMoveTo(Position, dir, Speed))
-                {
-                    validDirections.Add(dir);
-                }
+                if (_gameField.CanMoveTo(Position, Direction.Up, Speed))
+                    directions.Add(Direction.Up);
+                if (_gameField.CanMoveTo(Position, Direction.Down, Speed))
+                    directions.Add(Direction.Down);
+                if (_gameField.CanMoveTo(Position, Direction.Left, Speed))
+                    directions.Add(Direction.Left);
+                if (_gameField.CanMoveTo(Position, Direction.Right, Speed))
+                    directions.Add(Direction.Right);
             }
 
-            if (validDirections.Count == 0)
+            // Убираем противоположное направление
+            var opposite = GetOppositeDirection(Direction);
+            directions.Remove(opposite);
+
+            return directions;
+        }
+
+        private Direction GetOppositeDirection(Direction dir)
+        {
+            return dir switch
+            {
+                Direction.Up => Direction.Down,
+                Direction.Down => Direction.Up,
+                Direction.Left => Direction.Right,
+                Direction.Right => Direction.Left,
+                _ => Direction.None
+            };
+        }
+
+        private Direction ChooseDirection(List<Direction> availableDirections)
+        {
+            if (availableDirections.Count == 0)
                 return Direction.None;
 
-            // Если мы в уязвимом состоянии - убегаем
+            // Если мы в уязвимом состоянии - выбираем случайное направление
             if (State == GhostState.Vulnerable)
             {
-                return validDirections[_random.Next(validDirections.Count)];
+                return availableDirections[_random.Next(availableDirections.Count)];
             }
 
             // Если есть цель - пытаемся двигаться к ней
-            // Исправлено: проверяем, не нулевой ли вектор цели
-            if (!TargetPosition.Equals(default(Vector2)) &&
-                (TargetPosition.X != 0 || TargetPosition.Y != 0)) // Дополнительная проверка
+            if (!TargetPosition.Equals(default(Vector2)))
             {
-                // Находим направление, которое приближает к цели
-                Vector2 diff = TargetPosition - Position;
+                Direction bestDirection = Direction.None;
+                double bestDistance = double.MaxValue;
 
-                // Предпочитаем горизонтальное или вертикальное движение
-                Direction preferredDirection;
-                if (Math.Abs(diff.X) > Math.Abs(diff.Y))
+                foreach (var dir in availableDirections)
                 {
-                    preferredDirection = diff.X > 0 ? Direction.Right : Direction.Left;
-                }
-                else
-                {
-                    preferredDirection = diff.Y > 0 ? Direction.Down : Direction.Up;
+                    Vector2 testPos = Position;
+                    switch (dir)
+                    {
+                        case Direction.Up:
+                            testPos.Y -= Speed;
+                            break;
+                        case Direction.Down:
+                            testPos.Y += Speed;
+                            break;
+                        case Direction.Left:
+                            testPos.X -= Speed;
+                            break;
+                        case Direction.Right:
+                            testPos.X += Speed;
+                            break;
+                    }
+
+                    double distance = Math.Sqrt(
+                        Math.Pow(testPos.X - TargetPosition.X, 2) +
+                        Math.Pow(testPos.Y - TargetPosition.Y, 2)
+                    );
+
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestDirection = dir;
+                    }
                 }
 
-                // Если предпочитаемое направление доступно - используем его
-                if (validDirections.Contains(preferredDirection))
-                {
-                    return preferredDirection;
-                }
+                if (bestDirection != Direction.None)
+                    return bestDirection;
             }
 
             // Иначе выбираем случайное доступное направление
-            return validDirections[_random.Next(validDirections.Count)];
+            return availableDirections[_random.Next(availableDirections.Count)];
         }
 
-        private void MoveToGhostHouse(GameField gameField)
+        private void MoveToGhostHouse()
         {
-            // Призрак возвращается в дом
-            Vector2 housePos = _gameField?.GhostHouse ?? new Vector2(300, 200);
-            
-            // Простое движение к дому
+            if (_gameField == null) return;
+
+            Vector2 housePos = _gameField.GhostHouse;
+
+            // Двигаемся к дому
             Vector2 diff = housePos - Position;
-            
-            if (Math.Abs(diff.X) > 10)
+
+            if (Math.Abs(diff.X) > 5)
             {
                 Direction = diff.X > 0 ? Direction.Right : Direction.Left;
             }
-            else if (Math.Abs(diff.Y) > 10)
+            else if (Math.Abs(diff.Y) > 5)
             {
                 Direction = diff.Y > 0 ? Direction.Down : Direction.Up;
             }
@@ -202,11 +237,12 @@ namespace pacman3.Models.Ghosts
             {
                 // Достигли дома - возрождаемся
                 State = GhostState.Normal;
-                Direction = Direction.Down; // Выходим из дома
+                Direction = Direction.Down;
+                return;
             }
-            
+
             // Двигаемся в текущем направлении
-            if (Direction != Direction.None && _gameField != null)
+            if (Direction != Direction.None)
             {
                 Vector2 newPosition = Position;
                 switch (Direction)
@@ -224,13 +260,11 @@ namespace pacman3.Models.Ghosts
                         newPosition.X += Speed;
                         break;
                 }
-                
+
                 Position = newPosition;
             }
         }
 
-        // Добавляем ссылку на GameField для метода MoveToGhostHouse
-        private GameField _gameField;
         public void SetGameField(GameField gameField) => _gameField = gameField;
 
         public override void Update(TimeSpan gameTime)
@@ -246,7 +280,7 @@ namespace pacman3.Models.Ghosts
 
                 // Останавливаем предыдущий таймер, если он есть
                 _vulnerabilityTimer?.Stop();
-                
+
                 State = GhostState.Vulnerable;
 
                 // Таймер возврата в нормальное состояние
@@ -290,27 +324,6 @@ namespace pacman3.Models.Ghosts
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Ошибка в Die: {ex.Message}");
-            }
-        }
-
-        public void Respawn(Vector2 spawnPoint)
-        {
-            try
-            {
-                Position = spawnPoint;
-                State = GhostState.Normal;
-                Direction = Direction.Down;
-                Velocity = new Vector2(0, 0);
-                IsActive = true;
-                Speed = 2.0;
-                
-                // Останавливаем таймеры
-                _vulnerabilityTimer?.Stop();
-                _vulnerabilityTimer = null;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Ошибка в Respawn: {ex.Message}");
             }
         }
 

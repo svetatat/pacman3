@@ -41,7 +41,7 @@ namespace pacman3.Models
         public Direction NextDirection
         {
             get => _nextDirection;
-            private set => _nextDirection = value;
+            set => _nextDirection = value;
         }
 
         public event EventHandler<int> ScoreChanged;
@@ -71,6 +71,7 @@ namespace pacman3.Models
             IsMoving = false;
             IsInvulnerable = false;
             Velocity = new Vector2(0, 0);
+            Direction = Direction.Right; // Начальное направление
         }
 
         public void HandleInput(Key key)
@@ -208,7 +209,7 @@ namespace pacman3.Models
         {
             Position = spawnPoint;
             IsActive = true;
-            Direction = Direction.None;
+            Direction = Direction.Right; // Важно: явно устанавливаем направление
             NextDirection = Direction.None;
             Velocity = new Vector2(0, 0);
             IsMoving = false;
@@ -219,7 +220,7 @@ namespace pacman3.Models
         {
             Lives = 3;
             Score = 0;
-            Direction = Direction.None;
+            Direction = Direction.Right; // Явно устанавливаем направление
             NextDirection = Direction.None;
             Velocity = new Vector2(0, 0);
             IsMoving = false;
